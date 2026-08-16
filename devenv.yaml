@@ -1,0 +1,7 @@
+# See https://devenv.sh/reference/yaml-options/
+inputs:
+  nixpkgs-python:
+    url: github:cachix/nixpkgs-python
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
