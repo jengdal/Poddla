@@ -51,6 +51,10 @@
     '';
   };
 
+  enterShell = ''
+    source .devenv/state/venv/bin/activate
+  '';
+
   # Avoid building the python package from sources:
   cachix.pull = [ "nixpkgs-python" ];
 
