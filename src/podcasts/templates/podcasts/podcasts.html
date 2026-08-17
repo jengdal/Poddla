@@ -1,4 +1,47 @@
 {% extends "podcasts/base.html" %}
 {% block content %}
-  content
+<div data-signals:tab_id="'{{ tab_id }}'" data-init="@get('./sse/')">
+  {% for channel in channels %}
+    {{ channel.url }}
+  {% endfor %}
+
+</div>
+<button
+  commandfor="add-channel-dialog"
+  command="show-modal"
+  class="ui-button ui-outlined"
+>
+  Add Youtube Channel
+</button>
+
+<dialog
+  id="add-channel-dialog"
+  class="ui-dialog ui-card ui-elevated"
+  aria-labelledby="add-channel-heading"
+  aria-modal="true"
+>
+  <hgroup>
+    <h2 id="add-channel-heading" class="ui-h4">Add Youtube Channel</h2>
+  </hgroup>
+  <form method="post" data-on:submit="@post('{% url 'add_channel' %}', {contentType: 'form'})">
+    {% csrf_token %}
+    <input name="tab_id" value="{{ tab_id }}" type="hidden"/>
+    <div class="ui-content">
+      {{ add_channel_form.as_p }}
+    </div>
+    <div class="ui-actions">
+      <button
+        commandfor="add-channel-dialog"
+        command="close"
+        class="ui-button"
+        type="button"
+      >
+        Cancel
+      </button>
+      <button class="ui-button ui-filled" type="submit">
+        Save
+      </button>
+    </div>
+  </form>
+</dialog>
 {% endblock content %}

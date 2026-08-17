@@ -9,9 +9,10 @@
     <!-- <link rel="stylesheet" href="{% static 'vendor/font-awesome/css/all.min.css' %}" /> -->
 
     <link rel="stylesheet" as="style" href="{% static 'dist/opui.css' %}" />
+    <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/opui-css/dist/opui.css" /> -->
 
-    {% if request.user.is_authenticated %}
       <script type="module" defer src="{% static 'vendor/datastar.js' %}"></script>
+    {% if request.user.is_authenticated %}
     {% endif %}
 
     <title>Youtube to Podcast</title>
