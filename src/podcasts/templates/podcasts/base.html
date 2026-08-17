@@ -1,0 +1,26 @@
+<!doctype html>{% load static %}
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#C52F21" />
+    <!-- <link rel="shortcut icon" type="image/png" href="{% static 'images/favicon.png' %}" /> -->
+    <!-- <link rel="stylesheet" href="{% static 'vendor/font-awesome/css/all.min.css' %}" /> -->
+
+    <link rel="stylesheet" as="style" href="{% static 'styles.css' %}" />
+
+    {% if request.user.is_authenticated %}
+      <script type="module" defer src="{% static 'vendor/datastar.js' %}"></script>
+    {% endif %}
+
+    <title>Youtube to Podcast</title>
+  </head>
+  <body>
+    <header></header>
+
+    {% block content %}
+    {% endblock content %}
+    {% if DEBUG %}<ignore-djt data-ignore data-ignore-morph></ignore-djt>{% endif %}
+  </body>
+</html>
