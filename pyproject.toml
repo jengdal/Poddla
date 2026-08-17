@@ -9,7 +9,9 @@ dependencies = [
   "datastar-py>=1.0.2",
   "django>=6.1",
   "django-environ>=0.14.0",
+  "msgspec>=0.21.1",
   "uvicorn>=0.52.3",
+  "valkey-glide>=2.5.1",
 ]
 
 [project.scripts]
