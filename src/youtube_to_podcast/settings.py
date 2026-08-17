@@ -20,6 +20,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, True),
     ALLOWED_HOSTS=(list, []),
+    VALKEY_PORT=(int, None),
+    VALKEY_HOST=(str, "127.0.0.1"),
 )
 environ.Env.read_env(BASE_DIR.parent / ".env")
 
@@ -27,6 +29,9 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 
+
+VALKEY_PORT = env("VALKEY_PORT")
+VALKEY_HOST = env("VALKEY_HOST")
 
 # Application definition
 
