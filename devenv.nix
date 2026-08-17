@@ -7,6 +7,7 @@
 }:
 
 {
+  process.manager.implementation = "process-compose";
 
   # https://devenv.sh/packages/
   packages = [
@@ -14,6 +15,8 @@
     pkgs.nil
     pkgs.statix
     pkgs.nixfmt
+    pkgs.valkey
+
   ];
 
   # https://devenv.sh/languages/
@@ -63,7 +66,29 @@
     '';
   };
 
+  processes.valkey = {
+    exec = ''
+      if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+      fi
+      ${pkgs.valkey}/bin/valkey-server --port $VALKEY_PORT
+    '';
+
+    watch = {
+      paths = [
+        ./.env
+      ];
+    };
+  };
+
   enterShell = ''
+    if [ -f .env ]; then
+      set -a
+      source .env
+      set +a
+    fi
     source .devenv/state/venv/bin/activate
   '';
 
