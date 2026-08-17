@@ -1,0 +1,48 @@
+/* Layer order must come first */
+@layer openprops, theme, normalize, components.root, components.extended, utils;
+
+/* Open Props — use opui's curated entry point */
+@import "opui-css/open-props";
+
+/* Theme foundation */
+@import "opui-css/core/palette";
+@import "opui-css/css/theme";
+@import "opui-css/core/normalize";
+
+/* Components */
+@import "opui-css/css/components/button";
+@import "opui-css/css/components/callout";
+@import "opui-css/css/components/icon-button";
+@import "opui-css/css/components/tabs";
+@import "opui-css/css/components/toggle-group";
+@import "opui-css/css/components/toggle-button";
+@import "opui-css/css/components/anchor";
+@import "opui-css/css/components/avatar";
+@import "opui-css/css/components/card";
+@import "opui-css/css/components/chip";
+@import "opui-css/css/components/description-list";
+@import "opui-css/css/components/divider";
+@import "opui-css/css/components/link";
+@import "opui-css/css/components/table";
+@import "opui-css/css/components/progress";
+@import "opui-css/css/components/spinner";
+@import "opui-css/css/components/checkbox";
+@import "opui-css/css/components/radio";
+@import "opui-css/css/components/range";
+@import "opui-css/css/components/switch";
+@import "opui-css/css/components/toast";
+@import "opui-css/css/components/typography";
+@import "opui-css/css/components/badge";
+@import "opui-css/css/components/button-group";
+@import "opui-css/css/components/accordion";
+@import "opui-css/css/components/list";
+@import "opui-css/css/components/dialog";
+@import "opui-css/css/components/drawer";
+@import "opui-css/css/components/form";
+@import "opui-css/css/components/text-field";
+@import "opui-css/css/components/select";
+@import "opui-css/css/components/text-input";
+@import "opui-css/css/components/textarea";
+@import "opui-css/css/components/tooltip";
+
+@import "opui-css/core/utils";

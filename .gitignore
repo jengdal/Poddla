@@ -14,3 +14,7 @@ devenv.local.yaml
 
 # Environment
 .env
+
+node_modules
+
+src/youtube_to_podcast/static/dist/

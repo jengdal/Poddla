@@ -34,6 +34,18 @@
     };
   };
 
+  languages = {
+    # typescript.enable = true;
+    javascript = {
+      enable = true;
+
+      pnpm = {
+        enable = true;
+        install.enable = true;
+      };
+    };
+  };
+
   scripts.manage.exec = ''
     uv run src/manage.py "$@"
   '';

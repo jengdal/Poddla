@@ -1,0 +1,29 @@
+{
+  "name": "youtube-to-podcast",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.20.0",
+      "onFail": "download"
+    }
+  },
+  "type": "module",
+  "dependencies": {
+    "open-props": "^1.7.23",
+    "opui-css": "^5.4.2"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6",
+    "vite": "^8.2.1"
+  }
+}
