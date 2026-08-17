@@ -6,9 +6,10 @@ readme = "README.md"
 authors = [{ name = "John Engdal", email = "john@engdal.fi" }]
 requires-python = ">=3.14"
 dependencies = [
-    "django>=6.1",
-    "django-environ>=0.14.0",
-    "uvicorn>=0.52.3",
+  "datastar-py>=1.0.2",
+  "django>=6.1",
+  "django-environ>=0.14.0",
+  "uvicorn>=0.52.3",
 ]
 
 [project.scripts]
@@ -46,4 +47,10 @@ source-include = ["*.templates"]
 # "example_app.templates" = ["**/*"]
 
 [dependency-groups]
-dev = []
+dev = [
+  "basedpyright>=1.39.10",
+  "django-browser-reload>=1.21.0",
+  "django-debug-toolbar>=7.1.1",
+  "ipython>=9.16.1",
+  "ruff>=0.16.3",
+]
