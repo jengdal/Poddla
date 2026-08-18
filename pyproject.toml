@@ -53,6 +53,7 @@ dev = [
   "basedpyright>=1.39.10",
   "django-browser-reload>=1.21.0",
   "django-debug-toolbar>=7.1.1",
+  "django-extensions>=4.1",
   "ipython>=9.16.1",
   "ruff>=0.16.3",
 ]
