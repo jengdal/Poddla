@@ -29,6 +29,9 @@ class FeedSource(msgspec.Struct):
     video_count: int | None = None
 
 
+YOUTUBE_CACHE_KEY_PREFIX = "youtube:extract_info:"
+
+
 def _extract_info(url: str) -> dict:
     opts = {"quiet": True, "extract_flat": True, "ignoreerrors": True}
     with yt_dlp.YoutubeDL(opts) as ydl:
@@ -40,7 +43,7 @@ async def _extract_info_cached(
 ) -> dict:
     if vk is None:
         return await asyncio.to_thread(_extract_info, url)
-    cache_key = f"youtube:extract_info:{url}"
+    cache_key = f"{YOUTUBE_CACHE_KEY_PREFIX}{url}"
     cached = await vk.get(cache_key)
     if cached is not None:
         try:
