@@ -22,6 +22,7 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, []),
     VALKEY_PORT=(int, None),
     VALKEY_HOST=(str, "127.0.0.1"),
+    YOUTUBE_META_CACHE_SECONDS=(int, 3600),
 )
 environ.Env.read_env(BASE_DIR.parent / ".env")
 
@@ -32,6 +33,7 @@ ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 
 VALKEY_PORT = env("VALKEY_PORT")
 VALKEY_HOST = env("VALKEY_HOST")
+YOUTUBE_META_CACHE_SECONDS = env("YOUTUBE_META_CACHE_SECONDS")
 
 # Application definition
 
