@@ -5,17 +5,22 @@ from django.conf import settings
 from glide import GlideClient, GlideClientConfiguration, NodeAddress
 
 _client: GlideClient | None = None
+_client_loop: asyncio.AbstractEventLoop | None = None
 _lock = asyncio.Lock()
 
 
 async def get_client() -> GlideClient:
-    global _client
+    global _client, _client_loop
+    current_loop = asyncio.get_running_loop()
     async with _lock:
-        if _client is None:
+        # Ensure we only use the _client object from the same event loop that created it.
+        # This is mainly a thing for when using the django shell.
+        if _client is None or _client_loop is not current_loop:
             config = GlideClientConfiguration(
                 [NodeAddress(settings.VALKEY_HOST, settings.VALKEY_PORT)]
             )
             _client = await GlideClient.create(config)
+            _client_loop = current_loop
     return _client
 
 
