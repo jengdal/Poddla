@@ -21,8 +21,16 @@
       >
         Cancel
       </button>
-      <button class="ui-button ui-filled" type="submit">
-        Add
+      <button
+        class="ui-button ui-filled"
+        type="button"
+        data-on:click="@post('{% url 'add_channel_set_state' %}?preview', {contentType: 'form'})"
+      >
+        Preview
+      </button>
+
+      <button class="ui-button ui-filled" type="submit" {% if not state.can_save %}disabled{% endif %}>
+        Create a Podcast Feed
       </button>
     </div>
   </form>

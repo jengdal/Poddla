@@ -7,11 +7,13 @@ from datastar_py.django import (
     DatastarResponse,
     read_signals,
 )
+from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
 
 from podcasts.forms import ChannelForm
+from podcasts.youtube import FeedSource, VideoInfo, fetch_feed
 from youtube_to_podcast import valkey_client
 from youtube_to_podcast.state_store import StateStore
 
@@ -19,7 +21,9 @@ from youtube_to_podcast.state_store import StateStore
 class AddChannelState(msgspec.Struct):
     tab_id: str
     data: dict[str, str | list[str]] | None = None
-    has_error: bool = False
+    can_preview: bool = False
+    can_save: bool = False
+    feed: FeedSource | None = None
 
 
 _store: StateStore[AddChannelState] = StateStore(
@@ -101,17 +105,30 @@ async def set_state(request: HttpRequest):
         raise Exception()
     tab_id = str(tab_id)
     save = "save" in request.GET
+    preview = "preview" in request.GET
 
     vk = await valkey_client.get_client()
     state = await _store.get(vk, tab_id)
     state.data = dict(request.POST.items())
     form = ChannelForm(data=request.POST)
     if form.is_valid():
+        state.can_save = True
+        state.can_preview = True
         if save:
             await sync_to_async(form.save)()
             state.data = {}
-        state.has_error = False
+            state.can_save = False
+            state.can_preview = False
+        elif preview:
+            feed = await fetch_feed(
+                url=form.cleaned_data["url"],
+                cache_valkey_client=vk,
+                cache_seconds=settings.YOUTUBE_META_CACHE_SECONDS,
+            )
+            state.can_save = True
+            state.feed = feed
     else:
-        state.has_error = True
+        state.can_save = False
+        state.feed = None
     await _store.save(vk, tab_id, state)
     return HttpResponse(status=204)
