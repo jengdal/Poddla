@@ -112,11 +112,11 @@ async def set_state(request: HttpRequest):
     state.data = dict(request.POST.items())
     form = ChannelForm(data=request.POST)
     if form.is_valid():
-        state.can_save = True
         state.can_preview = True
         if save:
             await sync_to_async(form.save)()
             state.data = {}
+            state.feed = None
             state.can_save = False
             state.can_preview = False
         elif preview:
