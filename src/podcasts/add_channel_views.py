@@ -18,22 +18,22 @@ from youtube_to_podcast import valkey_client
 from youtube_to_podcast.state_store import StateStore
 
 
-class PodcastsState(msgspec.Struct):
+class AddChannelState(msgspec.Struct):
     tab_id: str
-    add_channel_data: dict[str, str | list[str]] | None = None
-    add_channel_has_error: bool = False
+    data: dict[str, str | list[str]] | None = None
+    has_error: bool = False
 
 
-_store: StateStore[PodcastsState] = StateStore(
-    PodcastsState,
-    namespace="podcasts",
-    default_factory=lambda tab_id: PodcastsState(tab_id=tab_id),
+_store: StateStore[AddChannelState] = StateStore(
+    AddChannelState,
+    namespace="add_channel",
+    default_factory=lambda tab_id: AddChannelState(tab_id=tab_id),
 )
 
 
-def sync_render_index(request: HttpRequest, state: PodcastsState):
-    if state.add_channel_has_error:
-        form = ChannelForm(data=state.add_channel_data)
+def sync_render_index(request: HttpRequest, state: AddChannelState):
+    if state.has_error:
+        form = ChannelForm(data=state.data)
         if form.is_valid():
             # Just to trigger the validation that then produces the errors that get rendered.
             pass
@@ -42,27 +42,27 @@ def sync_render_index(request: HttpRequest, state: PodcastsState):
 
     return render_to_string(
         request=request,
-        template_name="podcasts/podcasts.html",
+        template_name="podcasts/add_channel.html",
         context={
-            "tab_id": state.tab_id,
-            "add_channel_form": form,
-            "channels": Channel.objects.all().order_by("name"),
+            "state": state,
+            # "tab_id": state.tab_id,
+            "form": form,
         },
     )
 
 
-async def render_index(request: HttpRequest, state: PodcastsState):
+async def render_index(request: HttpRequest, state: AddChannelState):
     return await sync_to_async(sync_render_index)(request=request, state=state)
 
 
-async def podcasts(request: HttpRequest):
+async def add_channel(request: HttpRequest):
     tab_id = secrets.token_urlsafe(16)
     vk = await valkey_client.get_client()
     state = await _store.get(vk, tab_id)
     return HttpResponse(await render_index(request=request, state=state))
 
 
-async def podcasts_sse(request: HttpRequest):
+async def add_channel_sse(request: HttpRequest):
     signals = read_signals(request)
     if not signals:
         # TODO: Add this to the state and show a toast error or something.
@@ -96,7 +96,7 @@ async def podcasts_sse(request: HttpRequest):
 
 
 @require_POST
-async def add_channel(request: HttpRequest):
+async def set_state(request: HttpRequest):
     # We post using datastars "form" contentType, it leaves out signals so we use a tab_id input element instead:
     tab_id = request.POST.get("tab_id", None)
     if not tab_id:
@@ -109,10 +109,10 @@ async def add_channel(request: HttpRequest):
     form = ChannelForm(data=request.POST)
     if form.is_valid():
         await sync_to_async(form.save)()
-        state.add_channel_data = {}
-        state.add_channel_has_error = False
+        state.data = {}
+        state.has_error = False
     else:
-        state.add_channel_has_error = True
-        state.add_channel_data = dict(request.POST.items())
+        state.has_error = True
+        state.data = dict(request.POST.items())
     await _store.save(vk, tab_id, state)
     return HttpResponse(status=204)

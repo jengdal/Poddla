@@ -1,0 +1,25 @@
+{% extends "podcasts/base.html" %}
+{% block content %}
+<div id="add-channel-container" data-signals:tab_id="'{{ state.tab_id }}'" data-init="@get('{% url 'add_channel_sse' %}')">
+
+  <h1 id="add-channel-heading" class="ui-h4">Add Youtube Channel</h1>
+  <form id="add-channel-form" method="post" data-on:submit="@post('{% url 'add_channel_set_state' %}', {contentType: 'form'})">
+    {% csrf_token %}
+    <input name="tab_id" value="{{ state.tab_id }}" type="hidden"/>
+    <div class="ui-content">
+      {{ form.as_p }}
+    </div>
+    <div class="ui-actions">
+      <button
+        class="ui-button"
+        type="button"
+      >
+        Cancel
+      </button>
+      <button class="ui-button ui-filled" type="submit">
+        Add
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock content %}
