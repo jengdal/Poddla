@@ -55,8 +55,12 @@
 
   scripts.web = {
     exec = ''
-      uv run uvicorn --port 8000 --timeout-graceful-shutdown 0 --reload --reload-include *.css \
-              --reload-include *.js --reload-include *.html youtube_to_podcast.asgi:application
+      uv run uvicorn --port 8000 --timeout-graceful-shutdown 0 \
+              --reload --reload-dir src \
+              --reload-include '**/*.html' \
+              --reload-include '**/*.css' \
+              --reload-include '**/*.js' \
+              youtube_to_podcast.asgi:application
     '';
   };
 
