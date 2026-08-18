@@ -1,9 +1,10 @@
-import asyncio
 from typing import Literal
 
 import msgspec
 import yt_dlp
-from glide import ExpirySet, ExpiryType, GlideClient
+from glide import GlideClient
+
+from podcasts.youtube._cache import YOUTUBE_CACHE_KEY_PREFIX, run_cached
 
 
 class VideoInfo(msgspec.Struct):
@@ -28,9 +29,6 @@ class FeedSource(msgspec.Struct):
     thumbnail: str | None = None
     follower_count: int | None = None
     video_count: int | None = None
-
-
-YOUTUBE_CACHE_KEY_PREFIX = "youtube:extract_info:"
 
 
 def _extract_info(url: str) -> dict:
@@ -76,8 +74,14 @@ async def fetch_feed(
     cache_valkey_client: GlideClient | None = None,
     cache_seconds: int = 3600,
 ) -> FeedSource:
-    info = await _extract_info_cached(url, cache_valkey_client, cache_seconds)
+    info = await run_cached(
+        f"{YOUTUBE_CACHE_KEY_PREFIX}{url}",
+        lambda: _extract_info(url),
+        cache_valkey_client,
+        cache_seconds,
+    )
 
+    title = info.get("title", "")
     entries = list(info.get("entries") or [])
 
     # The root of a channel URL returns playlist entries, we have to use the Video tab:
@@ -86,8 +90,11 @@ async def fetch_feed(
             (e for e in entries if "Videos" in (e.get("title") or "")),
             entries[0],
         )
-        info = await _extract_info_cached(
-            videos_tab["webpage_url"], cache_valkey_client, cache_seconds
+        info = await run_cached(
+            f"{YOUTUBE_CACHE_KEY_PREFIX}{videos_tab['webpage_url']}",
+            lambda: _extract_info(videos_tab["webpage_url"]),
+            cache_valkey_client,
+            cache_seconds,
         )
         entries = list(info.get("entries") or [])
 
@@ -102,7 +109,7 @@ async def fetch_feed(
             url=e.get("url") or f"https://www.youtube.com/watch?v={e['id']}",
             duration=e.get("duration"),
             view_count=e.get("view_count"),
-            thumbnail=_best_thumbnail(e.get("thumbnails")),
+            thumbnail=_get_thumbnail(e.get("thumbnails")),
             timestamp=e.get("timestamp"),
         )
         for e in entries
@@ -111,7 +118,7 @@ async def fetch_feed(
 
     return FeedSource(
         url=url,
-        title=info.get("title") or "",
+        title=title,
         source_type=source_type,
         videos=videos,
         channel_id=info.get("channel_id"),
