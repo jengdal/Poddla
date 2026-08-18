@@ -10,7 +10,15 @@ def validate_youtube_url(value):
 
 
 class ChannelForm(forms.ModelForm):
-    url = forms.URLField(validators=[validate_youtube_url])
+    url = forms.URLField(
+        validators=[validate_youtube_url],
+        widget=forms.URLInput(
+            attrs={
+                # This gets rid of the client side validation, and it also makes the keyup post work:
+                "type": "text"
+            }
+        ),
+    )
 
     class Meta:
         model = Channel

@@ -1,4 +1,3 @@
-import asyncio
 import secrets
 
 import msgspec
@@ -13,7 +12,6 @@ from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
 
 from podcasts.forms import ChannelForm
-from podcasts.models import Channel
 from youtube_to_podcast import valkey_client
 from youtube_to_podcast.state_store import StateStore
 
@@ -32,7 +30,7 @@ _store: StateStore[AddChannelState] = StateStore(
 
 
 def sync_render_index(request: HttpRequest, state: AddChannelState):
-    if state.has_error:
+    if state.data:
         form = ChannelForm(data=state.data)
         if form.is_valid():
             # Just to trigger the validation that then produces the errors that get rendered.
@@ -45,7 +43,6 @@ def sync_render_index(request: HttpRequest, state: AddChannelState):
         template_name="podcasts/add_channel.html",
         context={
             "state": state,
-            # "tab_id": state.tab_id,
             "form": form,
         },
     )
@@ -103,16 +100,18 @@ async def set_state(request: HttpRequest):
         # TODO: Add this to the state and show a toast error or something.
         raise Exception()
     tab_id = str(tab_id)
+    save = "save" in request.GET
 
     vk = await valkey_client.get_client()
     state = await _store.get(vk, tab_id)
+    state.data = dict(request.POST.items())
     form = ChannelForm(data=request.POST)
     if form.is_valid():
-        await sync_to_async(form.save)()
-        state.data = {}
+        if save:
+            await sync_to_async(form.save)()
+            state.data = {}
         state.has_error = False
     else:
         state.has_error = True
-        state.data = dict(request.POST.items())
     await _store.save(vk, tab_id, state)
     return HttpResponse(status=204)

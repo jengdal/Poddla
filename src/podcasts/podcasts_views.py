@@ -1,4 +1,3 @@
-import asyncio
 import secrets
 
 import msgspec
@@ -10,18 +9,14 @@ from datastar_py.django import (
 )
 from django.http import HttpRequest, HttpResponse
 from django.template.loader import render_to_string
-from django.views.decorators.http import require_POST
 
-from podcasts.forms import ChannelForm
-from podcasts.models import Channel
+from podcasts.models import Channel, channel_publisher
 from youtube_to_podcast import valkey_client
 from youtube_to_podcast.state_store import StateStore
 
 
 class PodcastsState(msgspec.Struct):
     tab_id: str
-    add_channel_data: dict[str, str | list[str]] | None = None
-    add_channel_has_error: bool = False
 
 
 _store: StateStore[PodcastsState] = StateStore(
@@ -32,21 +27,11 @@ _store: StateStore[PodcastsState] = StateStore(
 
 
 def sync_render_index(request: HttpRequest, state: PodcastsState):
-    if state.add_channel_has_error:
-        form = ChannelForm(data=state.add_channel_data)
-        if form.is_valid():
-            # Just to trigger the validation that then produces the errors that get rendered.
-            pass
-    else:
-        form = ChannelForm()
-
     return render_to_string(
         request=request,
         template_name="podcasts/podcasts.html",
         context={
             "state": state,
-            "tab_id": state.tab_id,
-            "add_channel_form": form,
             "channels": Channel.objects.all().order_by("name"),
         },
     )
@@ -74,7 +59,8 @@ async def podcasts_sse(request: HttpRequest):
 
     async def generator():
         event_id = 0
-        sub = await valkey_client.create_subscriber(_store.channel(tab_id))
+        sub_state = await valkey_client.create_subscriber(_store.channel(tab_id))
+        sub_model = await valkey_client.create_subscriber(channel_publisher.channel)
         try:
             # Send current state immediately on connect.
             state = await _store.get(vk, tab_id)
@@ -83,7 +69,10 @@ async def podcasts_sse(request: HttpRequest):
             yield ServerSentEventGenerator.patch_elements(html, event_id=str(event_id))
 
             while True:
-                await sub.get_pubsub_message()
+                await valkey_client.wait_for_any(
+                    sub_state.get_pubsub_message(),
+                    sub_model.get_pubsub_message(),
+                )
                 state = await _store.get(vk, tab_id)
                 event_id += 1
                 html = await render_index(request=request, state=state)
@@ -91,29 +80,7 @@ async def podcasts_sse(request: HttpRequest):
                     html, event_id=str(event_id)
                 )
         finally:
-            await sub.close()
+            await sub_state.close()
+            await sub_model.close()
 
     return DatastarResponse(content=generator())
-
-
-@require_POST
-async def add_channel(request: HttpRequest):
-    # We post using datastars "form" contentType, it leaves out signals so we use a tab_id input element instead:
-    tab_id = request.POST.get("tab_id", None)
-    if not tab_id:
-        # TODO: Add this to the state and show a toast error or something.
-        raise Exception()
-    tab_id = str(tab_id)
-
-    vk = await valkey_client.get_client()
-    state = await _store.get(vk, tab_id)
-    form = ChannelForm(data=request.POST)
-    if form.is_valid():
-        await sync_to_async(form.save)()
-        state.add_channel_data = {}
-        state.add_channel_has_error = False
-    else:
-        state.add_channel_has_error = True
-        state.add_channel_data = dict(request.POST.items())
-    await _store.save(vk, tab_id, state)
-    return HttpResponse(status=204)

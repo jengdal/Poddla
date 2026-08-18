@@ -1,7 +1,7 @@
 {% extends "podcasts/base.html" %}
 {% block content %}
 
-<div id="podcasts-container" data-signals:tab_id="'{{ tab_id }}'" data-init="@get('{% url 'podcasts_sse' %}')">
+<div id="podcasts-container" data-signals:tab_id="'{{ state.tab_id }}'" data-init="@get('{% url 'podcasts_sse' %}')">
   {% for channel in channels %}
     {{ channel.url }}
   {% endfor %}
