@@ -1,0 +1,9 @@
+{% extends "podcasts/base.html" %}
+
+{% block content %}
+<div style="padding: 4rem 2rem; text-align: center;">
+  <h1>Page not found</h1>
+  <p>The page <code>{{ request_path }}</code> does not exist.</p>
+  <a href="{% url 'podcasts' %}" class="ui-button">Go to the front page</a>
+</div>
+{% endblock content %}
