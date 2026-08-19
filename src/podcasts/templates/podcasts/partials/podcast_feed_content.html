@@ -17,6 +17,7 @@
           <span class="ui-caption">{{ count }} episode{{ count|pluralize }}</span>
         {% endif %}
       {% endwith %}
+      <a href="{% url 'podcast_feed_rss' state.podcast_id %}" class="ui-button ui-outlined">RSS Feed</a>
     </div>
   </div>
 

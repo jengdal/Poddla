@@ -1,4 +1,7 @@
 {% extends "podcasts/base.html" %}
+{% block extra_head %}
+<link rel="alternate" type="application/rss+xml" title="{{ podcast.name }}" href="{% url 'podcast_feed_rss' state.podcast_id %}">
+{% endblock extra_head %}
 {% block content %}
 
 <div id="podcast-feed-container" data-signals:tab_id="'{{ state.tab_id }}'" data-init="@get('{% url 'podcast_feed_sse' state.podcast_id %}')">
