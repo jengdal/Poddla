@@ -1,4 +1,5 @@
 import secrets
+from datetime import datetime, timezone
 
 import msgspec
 from asgiref.sync import sync_to_async
@@ -12,8 +13,9 @@ from django.http import HttpRequest, HttpResponse
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
 
-from podcasts.forms import ChannelForm
-from podcasts.youtube import FeedSource, VideoInfo, fetch_feed
+from podcasts.forms import FeedForm
+from podcasts.models import Episode, PodcastFeed
+from podcasts.youtube import FeedSource, fetch_feed
 from youtube_to_podcast import valkey_client
 from youtube_to_podcast.state_store import StateStore
 
@@ -23,7 +25,7 @@ class AddChannelState(msgspec.Struct):
     data: dict[str, str | list[str]] | None = None
     can_preview: bool = False
     can_save: bool = False
-    feed: FeedSource | None = None
+    podcast_id: int | None = None
 
 
 _store: StateStore[AddChannelState] = StateStore(
@@ -33,14 +35,54 @@ _store: StateStore[AddChannelState] = StateStore(
 )
 
 
+def create_podcast_feed_draft(feed: FeedSource) -> PodcastFeed:
+    podcast = PodcastFeed.everything.create(
+        status=PodcastFeed.STATUS_DRAFT,
+        source_type=feed.source_type,
+        url=feed.url,
+        name=feed.title,
+        description=feed.description or "",
+        thumbnail=feed.thumbnail or "",
+    )
+    Episode.objects.bulk_create(
+        [
+            Episode(
+                podcast=podcast,
+                youtube_id=v.id,
+                title=v.title,
+                url=v.url,
+                duration=v.duration,
+                thumbnail=v.thumbnail or "",
+                published_at=datetime.fromtimestamp(v.timestamp, tz=timezone.utc)
+                if v.timestamp
+                else None,
+            )
+            for v in feed.videos
+        ]
+    )
+    return podcast
+
+
+def publish_channel(channel_pk: int) -> PodcastFeed:
+    channel = PodcastFeed.everything.get(pk=channel_pk, status=PodcastFeed.STATUS_DRAFT)
+    channel.status = PodcastFeed.STATUS_PUBLIC
+    channel.save()
+    return channel
+
+
 def sync_render_index(request: HttpRequest, state: AddChannelState):
     if state.data:
-        form = ChannelForm(data=state.data)
+        form = FeedForm(data=state.data)
         if form.is_valid():
-            # Just to trigger the validation that then produces the errors that get rendered.
             pass
     else:
-        form = ChannelForm()
+        form = FeedForm()
+
+    channel = None
+    if state.podcast_id is not None:
+        channel = PodcastFeed.everything.prefetch_related("episodes").get(
+            pk=state.podcast_id
+        )
 
     return render_to_string(
         request=request,
@@ -48,6 +90,7 @@ def sync_render_index(request: HttpRequest, state: AddChannelState):
         context={
             "state": state,
             "form": form,
+            "channel": channel,
         },
     )
 
@@ -110,13 +153,13 @@ async def set_state(request: HttpRequest):
     vk = await valkey_client.get_client()
     state = await _store.get(vk, tab_id)
     state.data = dict(request.POST.items())
-    form = ChannelForm(data=request.POST)
-    if form.is_valid():
+    form = FeedForm(data=request.POST)
+    if await sync_to_async(form.is_valid)():
         state.can_preview = True
-        if save:
-            await sync_to_async(form.save)()
+        if save and state.podcast_id:
+            await sync_to_async(publish_channel)(state.podcast_id)
             state.data = {}
-            state.feed = None
+            state.podcast_id = None
             state.can_save = False
             state.can_preview = False
         elif preview:
@@ -125,10 +168,11 @@ async def set_state(request: HttpRequest):
                 cache_valkey_client=vk,
                 cache_seconds=settings.YOUTUBE_META_CACHE_SECONDS,
             )
+            podcast = await sync_to_async(create_podcast_feed_draft)(feed)
             state.can_save = True
-            state.feed = feed
+            state.podcast_id = podcast.id
     else:
         state.can_save = False
-        state.feed = None
+        state.podcast_id = None
     await _store.save(vk, tab_id, state)
     return HttpResponse(status=204)

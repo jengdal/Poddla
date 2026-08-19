@@ -10,7 +10,7 @@ from datastar_py.django import (
 from django.http import HttpRequest, HttpResponse
 from django.template.loader import render_to_string
 
-from podcasts.models import Channel, channel_publisher
+from podcasts.models import PodcastFeed, podcast_publisher
 from youtube_to_podcast import valkey_client
 from youtube_to_podcast.state_store import StateStore
 
@@ -32,7 +32,7 @@ def sync_render_index(request: HttpRequest, state: PodcastsState):
         template_name="podcasts/podcasts.html",
         context={
             "state": state,
-            "channels": Channel.objects.all().order_by("name"),
+            "podcast_feeds": PodcastFeed.objects.all().order_by("name"),
         },
     )
 
@@ -60,7 +60,7 @@ async def podcasts_sse(request: HttpRequest):
     async def generator():
         event_id = 0
         sub_state = await valkey_client.create_subscriber(_store.channel(tab_id))
-        sub_model = await valkey_client.create_subscriber(channel_publisher.channel)
+        sub_model = await valkey_client.create_subscriber(podcast_publisher.channel)
         try:
             # Send current state immediately on connect.
             state = await _store.get(vk, tab_id)

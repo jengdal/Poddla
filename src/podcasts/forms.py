@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
-from podcasts.models import Channel
+from podcasts.models import PodcastFeed
 
 
 def validate_youtube_url(value):
@@ -9,17 +9,18 @@ def validate_youtube_url(value):
         raise ValidationError("URL must start with https://youtube.com")
 
 
-class ChannelForm(forms.ModelForm):
+def validate_unique(value):
+    if PodcastFeed.objects.filter(url=value).exists():
+        raise ValidationError("We already track that URL.")
+
+
+class FeedForm(forms.Form):
     url = forms.URLField(
-        validators=[validate_youtube_url],
+        validators=[validate_youtube_url, validate_unique],
         widget=forms.URLInput(
             attrs={
-                # This gets rid of the client side validation, and it also makes the keyup post work:
+                # This gets rid of the client side validation. An invalid form won't get @post'ed.
                 "type": "text"
             }
         ),
     )
-
-    class Meta:
-        model = Channel
-        fields = ("url",)
