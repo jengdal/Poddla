@@ -57,24 +57,26 @@ async def podcasts_sse(request: HttpRequest):
     tab_id = signals["tab_id"]
 
     vk = await valkey_client.get_client()
-    max_fps = 5
+    max_fps = 1
 
     async def generator():
         event_id = 0
-        sub_state = await valkey_client.create_subscriber(_store.channel(tab_id))
-        sub_model = await valkey_client.create_subscriber(podcast_publisher.channel)
-        try:
-            # Send current state immediately on connect, this primes the compression on the SSE stream.
-            state = await _store.get(vk, tab_id)
-            event_id += 1
-            html = await render_index(request=request, state=state)
-            yield ServerSentEventGenerator.patch_elements(html, event_id=str(event_id))
+        loop = asyncio.get_running_loop()
+        dirty = asyncio.Event()
 
+        def on_message(msg, ctx):
+            loop.call_soon_threadsafe(dirty.set)
+
+        sub_state = await valkey_client.create_subscriber(
+            _store.channel(tab_id), callback=on_message
+        )
+        sub_model = await valkey_client.create_subscriber(
+            podcast_publisher.channel, callback=on_message
+        )
+
+        try:
             while True:
-                await valkey_client.wait_for_any(
-                    sub_state.get_pubsub_message(),
-                    sub_model.get_pubsub_message(),
-                )
+                # Send the current state immediately, this primes the compression on the SSE stream:
                 state = await _store.get(vk, tab_id)
                 event_id += 1
                 html = await render_index(request=request, state=state)
@@ -84,6 +86,8 @@ async def podcasts_sse(request: HttpRequest):
                 # Limit the FPS. When a lot of episodes are created we can get a lot of events at once and
                 # don't want to create a new "frame" for each one:
                 await asyncio.sleep(1.0 / max_fps)
+                await dirty.wait()
+                dirty.clear()
         finally:
             await sub_state.close()
             await sub_model.close()
