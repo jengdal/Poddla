@@ -55,6 +55,11 @@
 
   scripts.web = {
     exec = ''
+      if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+      fi
       uv run uvicorn --port 8000 --timeout-graceful-shutdown 0 \
               --reload --reload-dir src \
               --reload-include '**/*.html' \
