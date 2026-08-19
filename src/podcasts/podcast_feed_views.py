@@ -8,8 +8,8 @@ from datastar_py.django import (
     DatastarResponse,
     read_signals,
 )
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import get_object_or_404
+from django.http import Http404, HttpRequest, HttpResponse
+from django.shortcuts import aget_object_or_404
 from django.template.loader import render_to_string
 
 from podcasts.models import PodcastFeed, podcast_publisher
@@ -29,8 +29,9 @@ _store: StateStore[PodcastFeedState] = StateStore(
 )
 
 
-def sync_render_index(request: HttpRequest, state: PodcastFeedState):
-    podcast = get_object_or_404(PodcastFeed.everything, pk=state.podcast_id)
+def sync_render_index(
+    request: HttpRequest, state: PodcastFeedState, podcast: PodcastFeed
+):
     episodes = list(podcast.episodes.order_by("-published_at"))
     return render_to_string(
         request=request,
@@ -43,19 +44,28 @@ def sync_render_index(request: HttpRequest, state: PodcastFeedState):
     )
 
 
-async def render_index(request: HttpRequest, state: PodcastFeedState):
-    return await sync_to_async(sync_render_index)(request=request, state=state)
+async def render_index(
+    request: HttpRequest, state: PodcastFeedState, podcast: PodcastFeed
+):
+    return await sync_to_async(sync_render_index)(
+        request=request, state=state, podcast=podcast
+    )
 
 
 async def podcast_feed(request: HttpRequest, podcast_id: int):
+    podcast = await aget_object_or_404(PodcastFeed.objects, pk=podcast_id)
     tab_id = secrets.token_urlsafe(16)
     vk = await valkey_client.get_client()
     state = PodcastFeedState(tab_id=tab_id, podcast_id=podcast_id)
     await _store.save(vk, tab_id, state)
-    return HttpResponse(await render_index(request=request, state=state))
+    return HttpResponse(
+        await render_index(request=request, state=state, podcast=podcast)
+    )
 
 
 async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
+    if not await PodcastFeed.objects.filter(id=podcast_id).aexists():
+        raise Http404
     signals = read_signals(request)
     if not signals:
         # TODO: Add this to the state and show a toast error or something.
@@ -84,10 +94,18 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
 
         try:
             while True:
-                # Send the current state immediately, this primes the compression on the SSE stream:
+                # Send the current state immediately, this primes the compression on the SSE stream.
                 state = await _store.get(vk, tab_id)
+
+                try:
+                    podcast = await PodcastFeed.objects.aget(pk=podcast_id)
+                except PodcastFeed.DoesNotExist:
+                    # The podcast has been deleted, we reload the page so that the user gets a 404:
+                    yield ServerSentEventGenerator.redirect("./")
+                    return
+
                 event_id += 1
-                html = await render_index(request=request, state=state)
+                html = await render_index(request=request, state=state, podcast=podcast)
                 yield ServerSentEventGenerator.patch_elements(
                     html, event_id=str(event_id)
                 )

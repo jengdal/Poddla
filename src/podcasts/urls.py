@@ -6,7 +6,9 @@ urlpatterns = [
     path("", podcasts_views.podcasts, name="podcasts"),
     path("sse/", podcasts_views.podcasts_sse, name="podcasts_sse"),
     path(
-        "podcast/<int:podcast_id>", podcast_feed_views.podcast_feed, name="podcast_feed"
+        "podcast/<int:podcast_id>/",
+        podcast_feed_views.podcast_feed,
+        name="podcast_feed",
     ),
     path(
         "podcast/<int:podcast_id>/sse/",
