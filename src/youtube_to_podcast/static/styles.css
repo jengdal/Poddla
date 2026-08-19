@@ -1,0 +1,71 @@
+.app-header {
+  background-color: var(--surface-2);
+  border-block-end: 1px solid var(--surface-3);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 100;
+}
+
+.app-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--size-4);
+  max-inline-size: 72rem;
+  margin-inline: auto;
+  padding-block: var(--size-3);
+  padding-inline: var(--size-5);
+}
+
+.app-brand {
+  font-size: var(--font-size-3);
+  font-weight: var(--font-weight-7);
+  text-decoration: none;
+  color: var(--text-1);
+}
+
+.app-brand:hover {
+  text-decoration: underline;
+}
+
+.app-main {
+  max-inline-size: 72rem;
+  margin-inline: auto;
+  padding-block: var(--size-8);
+  padding-inline: var(--size-5);
+}
+
+/* Podcasts grid */
+.podcast-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--size-4);
+}
+
+.podcast-card-thumbnail {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.podcast-card-thumbnail-placeholder {
+  width: 100%;
+  aspect-ratio: 1;
+  background-color: var(--surface-3);
+}
+
+.podcast-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2);
+  padding: var(--size-3);
+}
+
+/* Add-channel narrow layout */
+.add-channel-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-6);
+  max-inline-size: 40rem;
+  margin-inline: auto;
+}

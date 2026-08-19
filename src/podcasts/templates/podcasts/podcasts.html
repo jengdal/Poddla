@@ -2,10 +2,27 @@
 {% block content %}
 
 <div id="podcasts-container" data-signals:tab_id="'{{ state.tab_id }}'" data-init="@get('{% url 'podcasts_sse' %}')">
-  {% for podcast in podcast_feeds %}
-    {{ podcast.url }}
-  {% endfor %}
 
-  <a href="{% url 'add_channel' %}">Add Youtube Channel or Playlist</a>
+  {% if podcast_feeds %}
+    <div class="podcast-grid">
+      {% for podcast in podcast_feeds %}
+        <div class="ui-card">
+          {% if podcast.thumbnail %}
+            <img class="podcast-card-thumbnail" src="{{ podcast.thumbnail }}" alt="{{ podcast.name }}" />
+          {% else %}
+            <div class="podcast-card-thumbnail-placeholder"></div>
+          {% endif %}
+          <div class="podcast-card-body">
+            <span class="ui-title">{{ podcast.name }}</span>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="ui-callout">
+      <p>No podcasts yet. <a href="{% url 'add_channel' %}" class="ui-link">Add a YouTube channel or playlist</a> to get started.</p>
+    </div>
+  {% endif %}
+
 </div>
 {% endblock content %}

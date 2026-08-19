@@ -3,79 +3,106 @@
 {% block content %}
 <div id="add-channel-container" data-signals:tab_id="'{{ state.tab_id }}'" data-init="@get('{% url 'add_channel_sse' %}')">
 
-  <h1 id="add-channel-heading" class="ui-h4">Add Youtube Channel or Playlist</h1>
-  <form
-    id="add-channel-form"
-    method="post"
-    data-on:submit="@post('{% url 'add_channel_set_state' %}?preview', {contentType: 'form'})"
-    data-on:keyup__debounce.200ms__capture="@post('{% url 'add_channel_set_state' %}', {contentType: 'form'})"
-  >
-    {% csrf_token %}
-    <input name="tab_id" value="{{ state.tab_id }}" type="hidden"/>
-    <div class="ui-content">
-      {{ form.as_p }}
-    </div>
-    <div class="ui-actions">
-      <button
-        class="ui-button ui-filled"
-        type="submit"
-      >
-        Preview
-      </button>
+  <div class="add-channel-layout">
+    <h1 class="ui-h4">Add YouTube Channel or Playlist</h1>
 
-      <button
-        class="ui-button ui-filled"
-        type="button"
-        {% if not state.can_save %}disabled{% endif %}
-        data-on:click="@post('{% url 'add_channel_set_state' %}?save', {contentType: 'form'})"
-      >
-        Create a Podcast Feed
-      </button>
-    </div>
-  </form>
+    <form
+      id="add-channel-form"
+      class="ui-form"
+      method="post"
+      data-on:submit="@post('{% url 'add_channel_set_state' %}?preview', {contentType: 'form'})"
+      data-on:keyup__debounce.200ms__capture="@post('{% url 'add_channel_set_state' %}', {contentType: 'form'})"
+    >
+      {% csrf_token %}
+      <input name="tab_id" value="{{ state.tab_id }}" type="hidden" />
 
-  {% if channel %}
-  <div id="feed-preview" class="ui-card">
-    <div class="ui-header">
-      {% if channel.thumbnail %}
-        <img src="{{ channel.thumbnail }}" alt="{{ channel.name }}" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-2)">
-      {% endif %}
-      <div>
-        <div class="ui-title">{{ channel.name }}</div>
-        <span class="ui-chip">{{ channel.source_type }}</span>
-        {% if channel.description %}
-          <p class="ui-description">{{ channel.description }}</p>
+      <div class="ui-text-field" {% if form.url.errors %}data-invalid{% endif %}>
+        <label for="{{ form.url.id_for_label }}">YouTube URL</label>
+        <div class="ui-field">
+          {{ form.url }}
+        </div>
+        {% if form.url.errors %}
+          <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
+            {% for error in form.url.errors %}
+              <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
         {% endif %}
-        <dl class="ui-description-list">
-          {% if channel.video_count %}
-            <div><dt class="ui-term">Videos</dt><dd class="ui-value">{{ channel.video_count }}</dd></div>
-          {% endif %}
-        </dl>
       </div>
-    </div>
 
-    <ul class="ui-list">
-      {% for episode in channel.episodes.all %}
-      <li class="ui-item">
-        {% if episode.thumbnail %}
-          <img src="{{ episode.thumbnail }}" alt="{{ episode.title }}" style="width:64px;height:48px;object-fit:cover;border-radius:var(--radius-1);flex-shrink:0">
-        {% endif %}
-        <div class="ui-content">
-          <div>{{ episode.title }}</div>
-          <div style="display:flex;gap:var(--size-3)">
-            {% if episode.duration %}
-              <span class="ui-caption">{{ episode.duration|format_duration }}</span>
+      <div class="ui-actions">
+        <button
+          class="ui-button ui-filled"
+          type="submit"
+          {% if not state.can_preview %}disabled{% endif %}>
+          Preview
+        </button>
+        <button
+          class="ui-button"
+          type="button"
+          {% if not state.can_save %}disabled{% endif %}
+          data-on:click="@post('{% url 'add_channel_set_state' %}?save', {contentType: 'form'})"
+        >
+          Create Podcast Feed
+        </button>
+      </div>
+    </form>
+
+    {% if channel %}
+      {% if channel.episodes.all %}
+      <div id="feed-preview" class="ui-card">
+        <div style="display:flex;gap:var(--size-4);align-items:flex-start;padding:var(--size-4)">
+          {% if channel.thumbnail %}
+            <img
+              src="{{ channel.thumbnail }}"
+              alt="{{ channel.name }}"
+              style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-2);flex-shrink:0"
+            />
+          {% endif %}
+          <div style="display:flex;flex-direction:column;gap:var(--size-2)">
+            <span class="ui-title">{{ channel.name }}</span>
+            {% if channel.source_type %}
+              <span class="ui-chip">{{ channel.source_type }}</span>
             {% endif %}
-            {% if episode.published_at %}
-              <span class="ui-caption">{{ episode.published_at|date:"j M Y" }}</span>
+            {% if channel.description %}
+              <p class="ui-description">{{ channel.description }}</p>
+            {% endif %}
+            {% if channel.video_count %}
+              <dl class="ui-description-list">
+                <div><dt class="ui-term">Videos</dt><dd class="ui-value">{{ channel.video_count }}</dd></div>
+              </dl>
             {% endif %}
           </div>
         </div>
-      </li>
-      {% endfor %}
-    </ul>
+        <ul class="ui-list">
+          {% for episode in channel.episodes.all %}
+          <li class="ui-item">
+            {% if episode.thumbnail %}
+              <img src="{{ episode.thumbnail }}" alt="{{ episode.title }}" style="width:80px;height:48px;object-fit:cover;border-radius:var(--radius-1);flex-shrink:0">
+            {% endif %}
+            <div class="ui-content">
+              <div>{{ episode.title }}</div>
+              <div style="display:flex;gap:var(--size-3)">
+                {% if episode.duration %}<span class="ui-caption">{{ episode.duration|format_duration }}</span>{% endif %}
+                {% if episode.published_at %}<span class="ui-caption">{{ episode.published_at|date:"j M Y" }}</span>{% endif %}
+              </div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% elif channel.name %}
+      <div id="feed-preview" class="ui-callout">
+        <p>No videos were found for this {{ channel.source_type }}.</p>
+      </div>
+      {% else %}
+      <div id="feed-preview" class="ui-callout">
+        <p>Nothing was found at that URL. Try a different channel or playlist link.</p>
+      </div>
+      {% endif %}
+    {% endif %}
+
   </div>
-  {% endif %}
 
 </div>
 {% endblock content %}

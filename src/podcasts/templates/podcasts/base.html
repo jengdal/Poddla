@@ -15,13 +15,21 @@
     {% if request.user.is_authenticated %}
     {% endif %}
 
+    <link rel="stylesheet" href="{% static 'styles.css' %}" />
     <title>Youtube to Podcast</title>
   </head>
   <body>
-    <header></header>
-
-    {% block content %}
-    {% endblock content %}
+    <header class="app-header">
+      <div class="app-header-inner">
+        <a href="{% url 'podcasts' %}" class="app-brand">Youtube to Podcast</a>
+        <nav>
+          <a href="{% url 'add_channel' %}" class="ui-button ui-outlined">Add Channel</a>
+        </nav>
+      </div>
+    </header>
+    <main class="app-main">
+      {% block content %}{% endblock content %}
+    </main>
     {% if DEBUG %}<ignore-djt data-ignore data-ignore-morph></ignore-djt>{% endif %}
   </body>
 </html>

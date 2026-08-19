@@ -22,7 +22,9 @@ class FeedForm(forms.Form):
         widget=forms.URLInput(
             attrs={
                 # This gets rid of the client side validation. An invalid form won't get @post'ed.
-                "type": "text"
+                "type": "text",
+                "class": "ui-text-input",
+                "placeholder": "https://youtube.com/channel/...",
             }
         ),
     )
