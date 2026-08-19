@@ -61,12 +61,14 @@ async def podcasts_sse(request: HttpRequest):
 
     async def generator():
         event_id = 0
-        loop = asyncio.get_running_loop()
         dirty = asyncio.Event()
 
         def on_message(msg, ctx):
-            loop.call_soon_threadsafe(dirty.set)
+            dirty.set()
 
+        # We use glide's callback mode because we only care about the latest message, and the
+        # polling mode keeps an unbounded list of all messages, which is not at all what we need:
+        # https://glide.valkey.io/how-to/publish-and-subscribe-messages/#receiving-messages
         sub_state = await valkey_client.create_subscriber(
             _store.channel(tab_id), callback=on_message
         )
