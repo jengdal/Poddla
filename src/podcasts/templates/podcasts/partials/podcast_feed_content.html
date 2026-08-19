@@ -1,0 +1,47 @@
+{% load podcast_filters %}
+<div class="podcast-feed-layout">
+
+  <div class="podcast-feed-header">
+    {% if podcast.thumbnail %}
+      <img src="{{ podcast.thumbnail }}" alt="{{ podcast.name }}" class="podcast-feed-thumbnail" />
+    {% else %}
+      <div class="podcast-feed-thumbnail-placeholder"></div>
+    {% endif %}
+    <div class="podcast-feed-meta">
+      <h2 class="ui-h4">{{ podcast.name }}</h2>
+      {% if podcast.description %}
+        <p class="ui-description">{{ podcast.description }}</p>
+      {% endif %}
+      {% with count=episodes|length %}
+        {% if count %}
+          <span class="ui-caption">{{ count }} episode{{ count|pluralize }}</span>
+        {% endif %}
+      {% endwith %}
+    </div>
+  </div>
+
+  {% if episodes %}
+    <ul class="ui-list" style="--_bg-color: transparent">
+      {% for episode in episodes %}
+      <li class="ui-item">
+        {% if episode.thumbnail %}
+          <img src="{{ episode.thumbnail }}" alt="{{ episode.title }}"
+               style="width:80px;height:48px;object-fit:cover;border-radius:var(--radius-1);flex-shrink:0">
+        {% endif %}
+        <div class="ui-content">
+          <a href="{{ episode.url }}" target="_blank" rel="noopener" class="ui-link">{{ episode.title }}</a>
+          <div style="display:flex;gap:var(--size-3)">
+            {% if episode.duration %}<span class="ui-caption">{{ episode.duration|format_duration }}</span>{% endif %}
+            {% if episode.published_at %}<span class="ui-caption">{{ episode.published_at|date:"j M Y" }}</span>{% endif %}
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="ui-callout">
+      <p>No episodes yet.</p>
+    </div>
+  {% endif %}
+
+</div>
