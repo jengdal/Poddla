@@ -18,6 +18,7 @@ devenv.local.yaml
 node_modules
 
 src/youtube_to_podcast/static/dist/
+staticfiles
 
 db.sqlite3
 dump.rdb
