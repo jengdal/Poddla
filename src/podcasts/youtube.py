@@ -78,6 +78,7 @@ async def fetch_feed(
 ) -> FeedSource:
     info = await _extract_info_cached(url, cache_valkey_client, cache_seconds)
 
+    title = info.get("title", "")
     entries = list(info.get("entries") or [])
 
     # The root of a channel URL returns playlist entries, we have to use the Video tab:
@@ -111,7 +112,7 @@ async def fetch_feed(
 
     return FeedSource(
         url=url,
-        title=info.get("title") or "",
+        title=title,
         source_type=source_type,
         videos=videos,
         channel_id=info.get("channel_id"),
