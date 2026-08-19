@@ -61,6 +61,45 @@
   padding: var(--size-3);
 }
 
+/* Podcast cards as links */
+a.ui-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Podcast feed detail page */
+.podcast-feed-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-6);
+}
+
+.podcast-feed-header {
+  display: flex;
+  gap: var(--size-5);
+  align-items: flex-start;
+}
+
+.podcast-feed-thumbnail,
+.podcast-feed-thumbnail-placeholder {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: var(--radius-3);
+  flex-shrink: 0;
+}
+
+.podcast-feed-thumbnail-placeholder {
+  background-color: var(--surface-3);
+}
+
+.podcast-feed-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2);
+}
+
 /* Add-channel narrow layout */
 .add-channel-layout {
   display: flex;

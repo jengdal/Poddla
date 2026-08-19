@@ -6,7 +6,7 @@
   {% if podcast_feeds %}
     <div class="podcast-grid">
       {% for podcast in podcast_feeds %}
-        <div class="ui-card">
+        <a href="{% url 'podcast_feed' podcast.id %}" class="ui-card">
           {% if podcast.thumbnail %}
             <img class="podcast-card-thumbnail" src="{{ podcast.thumbnail }}" alt="{{ podcast.name }}" />
           {% else %}
@@ -15,7 +15,7 @@
           <div class="podcast-card-body">
             <span class="ui-title">{{ podcast.name }}</span>
           </div>
-        </div>
+        </a>
       {% endfor %}
     </div>
   {% else %}
