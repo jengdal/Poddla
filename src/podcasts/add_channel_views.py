@@ -152,8 +152,11 @@ async def set_state(request: HttpRequest):
 
     vk = await valkey_client.get_client()
     state = await _store.get(vk, tab_id)
-    state.data = dict(request.POST.items())
-    form = FeedForm(data=request.POST)
+    if request.POST.get("url", None):
+        state.data = dict(request.POST.items())
+    else:
+        state.data = None
+    form = FeedForm(data=state.data)
     if await sync_to_async(form.is_valid)():
         state.can_preview = True
         if save and state.podcast_id:
@@ -173,6 +176,8 @@ async def set_state(request: HttpRequest):
             state.podcast_id = podcast.id
     else:
         state.can_save = False
+        state.can_preview = False
         state.podcast_id = None
+
     await _store.save(vk, tab_id, state)
     return HttpResponse(status=204)

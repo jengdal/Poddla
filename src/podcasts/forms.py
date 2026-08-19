@@ -16,6 +16,8 @@ def validate_unique(value):
 
 class FeedForm(forms.Form):
     url = forms.URLField(
+        # The client side validation of this prevents submission, we want all validation on the server:
+        required=False,
         validators=[validate_youtube_url, validate_unique],
         widget=forms.URLInput(
             attrs={
