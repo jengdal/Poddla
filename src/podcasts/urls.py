@@ -7,17 +7,17 @@ urlpatterns = [
     path("", podcasts_views.podcasts, name="podcasts"),
     path("sse/", podcasts_views.podcasts_sse, name="podcasts_sse"),
     path(
-        "podcast/<int:podcast_id>/",
+        "p/<int:podcast_id>/",
         podcast_feed_views.podcast_feed,
         name="podcast_feed",
     ),
     path(
-        "podcast/<int:podcast_id>/sse/",
+        "p/<int:podcast_id>/sse/",
         podcast_feed_views.podcast_feed_sse,
         name="podcast_feed_sse",
     ),
     path(
-        "podcast/<int:podcast_id>/rss/",
+        "p/<int:podcast_id>/rss/",
         PodcastFeedRss(),
         name="podcast_feed_rss",
     ),
