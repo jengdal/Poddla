@@ -67,15 +67,16 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
     if not await PodcastFeed.objects.filter(id=podcast_id).aexists():
         raise Http404
     signals = read_signals(request)
-    if not signals:
-        # TODO: Add this to the state and show a toast error or something.
-        raise Exception()
-    tab_id = signals["tab_id"]
 
     vk = await valkey_client.get_client()
     max_fps = 1
 
     async def generator():
+        if not signals:
+            # Reload because this doesn't make sense.
+            yield ServerSentEventGenerator.redirect("./")
+            return
+        tab_id = signals["tab_id"]
         event_id = 0
         dirty = asyncio.Event()
 
