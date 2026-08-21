@@ -2,10 +2,9 @@ import asyncio
 
 from django.core.management.base import BaseCommand
 
-from podcasts.youtube import YOUTUBE_CACHE_KEY_PREFIX
 from youtube_to_podcast import valkey_client
 
-_CACHE_KEY_PATTERN = f"{YOUTUBE_CACHE_KEY_PREFIX}*"
+_CACHE_KEY_PATTERN = "youtube:*"
 
 
 class Command(BaseCommand):

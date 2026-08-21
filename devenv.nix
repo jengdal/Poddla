@@ -6,6 +6,10 @@
   ...
 }:
 
+let
+  bgutil-server = pkgs.callPackage ./bgutil-server.nix { };
+in
+
 {
   process.manager.implementation = "process-compose";
 
@@ -16,6 +20,10 @@
     pkgs.statix
     pkgs.nixfmt
     pkgs.valkey
+
+    # For yt-dlp:
+    pkgs.deno
+    pkgs.ffmpeg
 
   ];
 
@@ -74,6 +82,8 @@
       web
     '';
   };
+
+  env.BGUTIL_SERVER_HOME = "${bgutil-server}";
 
   processes.valkey = {
     exec = ''

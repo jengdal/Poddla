@@ -21,6 +21,11 @@ urlpatterns = [
         PodcastFeedRss(),
         name="podcast_feed_rss",
     ),
+    path(
+        "e/<int:episode_id>/media/",
+        podcast_feed_views.episode_media,
+        name="podcast_episode_media",
+    ),
     path("add-channel/", add_channel_views.add_channel, name="add_channel"),
     path("add-channel/sse/", add_channel_views.add_channel_sse, name="add_channel_sse"),
     path(

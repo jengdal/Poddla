@@ -55,6 +55,7 @@ class PodcastFeedRss(Feed):
     feed_type = PodcastRssFeed
 
     def get_object(self, request, podcast_id):
+        self.request = request
         return get_object_or_404(PodcastFeed.objects, pk=podcast_id)
 
     def title(self, obj):
@@ -80,6 +81,17 @@ class PodcastFeedRss(Feed):
 
     def item_link(self, item):
         return item.url
+
+    def item_enclosure_url(self, item):
+        return self.request.build_absolute_uri(
+            reverse("podcast_episode_media", args=[item.pk])
+        )
+
+    def item_enclosure_length(self, item):
+        return 0
+
+    def item_enclosure_mime_type(self, item):
+        return "audio/mp4"
 
     def item_extra_kwargs(self, item):
         return {

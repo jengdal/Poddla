@@ -23,6 +23,9 @@ env = environ.Env(
     VALKEY_PORT=(int, None),
     VALKEY_HOST=(str, "127.0.0.1"),
     YOUTUBE_META_CACHE_SECONDS=(int, 3600),
+    YOUTUBE_AUDIO_CACHE_SECONDS=(int, 3600),
+    MEDIA_ROOT=(str, None),
+    BGUTIL_SERVER_HOME=(str, ""),
 )
 environ.Env.read_env(BASE_DIR.parent / ".env")
 
@@ -34,6 +37,10 @@ ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 VALKEY_PORT = env("VALKEY_PORT")
 VALKEY_HOST = env("VALKEY_HOST")
 YOUTUBE_META_CACHE_SECONDS = env("YOUTUBE_META_CACHE_SECONDS")
+YOUTUBE_AUDIO_CACHE_SECONDS = env("YOUTUBE_AUDIO_CACHE_SECONDS")
+MEDIA_URL = "/media/"
+MEDIA_ROOT = Path(env("MEDIA_ROOT"))
+BGUTIL_SERVER_HOME = env("BGUTIL_SERVER_HOME")
 
 # Application definition
 

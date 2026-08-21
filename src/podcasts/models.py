@@ -64,6 +64,8 @@ class Episode(models.Model):
     published_at = models.DateTimeField(null=True, blank=True)
     show_notes = models.TextField()
 
+    file_path = models.CharField(max_length=100, null=True, blank=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
