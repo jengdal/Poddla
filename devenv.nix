@@ -11,6 +11,9 @@ let
 in
 
 {
+  dotenv.enable = false;
+  dotenv.disableHint = true;
+
   process.manager.implementation = "process-compose";
 
   # https://devenv.sh/packages/
