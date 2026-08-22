@@ -133,12 +133,35 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
     return DatastarResponse(content=generator())
 
 
+async def _download_and_save(episode: Episode, media_root: Path, lock_key: str) -> None:
+    vk = await valkey_client.get_client()
+    try:
+        rel_path = Path(str(episode.podcast_id)) / str(episode.id)
+        download_info = await asyncio.to_thread(
+            download_audio, episode.url, media_root, rel_path
+        )
+        episode.file_path = str(download_info.file_path.relative_to(media_root))
+        episode.published_at = download_info.published_at
+        episode.duration = download_info.duration
+        episode.show_notes = str(download_info.description or "")
+        # Use save instead of update so that we trigger the podcast_publisher automatically through the post_save signal
+        await episode.asave(
+            update_fields=(
+                "published_at",
+                "duration",
+                "show_notes",
+                "file_path",
+            )
+        )
+    finally:
+        await vk.delete([lock_key])
+
+
 async def episode_media(request: HttpRequest, episode_id: int):
     episode = await aget_object_or_404(Episode, pk=episode_id)
     media_root = Path(settings.MEDIA_ROOT)
     lock_key = f"download:lock:{episode_id}"
 
-    episode_file: Path | None = None
     while True:
         episode_file = episode.file_exists()
         if episode_file:
@@ -153,28 +176,15 @@ async def episode_media(request: HttpRequest, episode_id: int):
         )
 
         if acquired:
+            task = asyncio.create_task(
+                _download_and_save(episode, media_root, lock_key)
+            )
             try:
-                rel_path = Path(str(episode.podcast_id)) / str(episode.id)
-                download_info = await asyncio.to_thread(
-                    download_audio, episode.url, media_root, rel_path
-                )
-                episode_file = download_info.file_path
-                episode.file_path = str(download_info.file_path.relative_to(media_root))
-                episode.published_at = download_info.published_at
-                episode.duration = download_info.duration
-                episode.show_notes = str(download_info.description or "")
-                # Use save instead of update so that we trigger the podcast_publisher automatically throught the save signal
-                await episode.asave(
-                    update_fields=(
-                        "published_at",
-                        "duration",
-                        "show_notes",
-                        "file_path",
-                    )
-                )
-            finally:
-                await vk.delete([lock_key])
-            break
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                # Client disconnected — the task keeps running, holding the lock until done
+                raise
+            episode = await Episode.objects.aget(pk=episode_id)
         else:
             event = asyncio.Event()
             channel = podcast_publisher.channel_for(episode.pk)
