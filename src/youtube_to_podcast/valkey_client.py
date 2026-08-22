@@ -18,7 +18,8 @@ async def get_client() -> GlideClient:
         # This is mainly a thing for when using the django shell.
         if _client is None or _client_loop is not current_loop:
             config = GlideClientConfiguration(
-                [NodeAddress(settings.VALKEY_HOST, settings.VALKEY_PORT)]
+                [NodeAddress(settings.VALKEY_HOST, settings.VALKEY_PORT)],
+                database_id=settings.VALKEY_DB,
             )
             _client = await GlideClient.create(config)
             _client_loop = current_loop
@@ -34,6 +35,7 @@ async def create_subscriber(
     if callback is not None:
         config = GlideClientConfiguration(
             nodes,
+            database_id=settings.VALKEY_DB,
             pubsub_subscriptions=GlideClientConfiguration.PubSubSubscriptions(
                 channels_and_patterns={
                     GlideClientConfiguration.PubSubChannelModes.Exact: {channel}
@@ -43,7 +45,7 @@ async def create_subscriber(
             ),
         )
         return await GlideClient.create(config)
-    config = GlideClientConfiguration(nodes)
+    config = GlideClientConfiguration(nodes, database_id=settings.VALKEY_DB)
     client = await GlideClient.create(config)
     await client.subscribe({channel}, timeout_ms=5000)
     return client
