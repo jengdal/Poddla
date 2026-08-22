@@ -158,6 +158,16 @@ async def _download_and_save(episode: Episode, media_root: Path, lock_key: str) 
 
 
 async def episode_media(request: HttpRequest, episode_id: int):
+    """
+    This view serve episode audio.
+    - If the file already exists on our filesystem, it is served directly.
+    - If the file doesn't exist, it's downloaded first.
+    - When there are multiple simultaneous clients requesting the same
+      episode file, only the first client triggers a download, the others
+      wait until it's finished and they all get served the same file. See
+      the code and comments for more details.
+    - If a client disconnects mid-download from YT, the download continues.
+    """
     episode = await aget_object_or_404(Episode, pk=episode_id)
     media_root = Path(settings.MEDIA_ROOT)
     lock_key = f"download:lock:{episode_id}"
