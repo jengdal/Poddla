@@ -25,6 +25,8 @@ def download_audio(url: str, base_path: Path, file_path: Path) -> DownloadInfo:
         "no_warnings": True,
         "noprogress": True,
         "noplaylist": True,
+        # Don't keep .part files around when a download fails, we don't know if the part file is corrupt or even the same content anymore:
+        "keeppartial": False,
         "extractor_args": extractor_args,
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
