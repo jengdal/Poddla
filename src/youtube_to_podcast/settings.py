@@ -93,6 +93,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "youtube_to_podcast.wsgi.application"
+TEST_RUNNER = "youtube_to_podcast.runner.Runner"
 
 
 # Database
