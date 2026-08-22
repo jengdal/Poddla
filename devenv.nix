@@ -23,8 +23,6 @@ in
 
     # For yt-dlp:
     pkgs.deno
-    pkgs.ffmpeg
-
   ];
 
   # https://devenv.sh/languages/
