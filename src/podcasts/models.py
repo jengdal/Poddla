@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from django.conf import settings
 from django.db import models
 
 from youtube_to_podcast.model_publisher import ModelPublisher
@@ -65,6 +68,15 @@ class Episode(models.Model):
     show_notes = models.TextField()
 
     file_path = models.CharField(max_length=100, null=True, blank=True)
+
+    def file_exists(self) -> Path | None:
+        media_root = Path(settings.MEDIA_ROOT)
+        if self.file_path:
+            episode_file = media_root / str(self.file_path)
+        else:
+            episode_file = None
+        if episode_file is not None and episode_file.exists():
+            return episode_file
 
     class Meta:
         constraints = [

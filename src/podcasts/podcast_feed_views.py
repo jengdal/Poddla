@@ -20,6 +20,7 @@ from django.http import (
 )
 from django.shortcuts import aget_object_or_404
 from django.template.loader import render_to_string
+from glide import ConditionalChange, ExpirySet, ExpiryType
 
 from podcasts.models import Episode, PodcastFeed, podcast_publisher
 from podcasts.youtube.video import download_audio
@@ -135,28 +136,71 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
 async def episode_media(request: HttpRequest, episode_id: int):
     episode = await aget_object_or_404(Episode, pk=episode_id)
     media_root = Path(settings.MEDIA_ROOT)
+    lock_key = f"download:lock:{episode_id}"
 
     episode_file: Path | None = None
-    if episode.file_path:
-        episode_file = media_root / episode.file_path
+    while True:
+        episode_file = episode.file_exists()
+        if episode_file:
+            break
 
-    if episode_file is None or not episode_file.exists():
-        rel_path = Path(str(episode.podcast_id)) / str(episode.id)
-        download_info = await asyncio.to_thread(
-            download_audio, episode.url, media_root, rel_path
+        vk = await valkey_client.get_client()
+        acquired = await vk.set(
+            lock_key,
+            b"1",
+            conditional_set=ConditionalChange.ONLY_IF_DOES_NOT_EXIST,
+            expiry=ExpirySet(ExpiryType.SEC, 300),
         )
-        # The downloader appends a file extension to the filename we gave it, so we need to use the update one:
-        episode_file = download_info.file_path
 
-        episode.file_path = str(download_info.file_path.relative_to(media_root))
-        episode.published_at = download_info.published_at
-        episode.duration = download_info.duration
-        episode.show_notes = str(download_info.description or "")
+        if acquired:
+            try:
+                rel_path = Path(str(episode.podcast_id)) / str(episode.id)
+                download_info = await asyncio.to_thread(
+                    download_audio, episode.url, media_root, rel_path
+                )
+                episode_file = download_info.file_path
+                episode.file_path = str(download_info.file_path.relative_to(media_root))
+                episode.published_at = download_info.published_at
+                episode.duration = download_info.duration
+                episode.show_notes = str(download_info.description or "")
+                # Use save instead of update so that we trigger the podcast_publisher automatically throught the save signal
+                await episode.asave(
+                    update_fields=(
+                        "published_at",
+                        "duration",
+                        "show_notes",
+                        "file_path",
+                    )
+                )
+            finally:
+                await vk.delete([lock_key])
+            break
+        else:
+            event = asyncio.Event()
+            channel = podcast_publisher.channel_for(episode.pk)
 
-        # Use save instead of update so that we trigger the podcast_publisher automatically throught the save signal
-        await episode.asave(
-            update_fields=("published_at", "duration", "show_notes", "file_path")
-        )
+            def on_update(msg, ctx):
+                ctx.set()
+
+            subscriber = await valkey_client.create_subscriber(
+                channel, callback=on_update, context=event
+            )
+            try:
+                # Check the episode again in case the download finished between the failed lock and now:
+                episode = await Episode.objects.aget(pk=episode_id)
+                episode_file = episode.file_exists()
+                if episode_file:
+                    break
+                try:
+                    # We wait until the other request has finished downloading the file, OR until 15 seconds has passed.
+                    # The max 15 second wait makes it so that we react to cancelled requests quicker, and get to restart from an active waiter.
+                    await asyncio.wait_for(event.wait(), timeout=15)
+                except asyncio.TimeoutError:
+                    pass
+            finally:
+                await subscriber.close()
+
+            episode = await Episode.objects.aget(pk=episode_id)
 
     # TODO: Use nginx to serve the file instead:
     return _serve_with_range(request, episode_file)
