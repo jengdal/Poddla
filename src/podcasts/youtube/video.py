@@ -19,6 +19,7 @@ def download_audio(url: str, base_path: Path, file_path: Path) -> DownloadInfo:
     extractor_args: dict = {"youtube": {"player_client": ["mweb"]}}
     if bgutil_home := settings.BGUTIL_SERVER_HOME:
         extractor_args["youtubepot-bgutilscript"] = {"server_home": [bgutil_home]}
+    # TODO: Any reason to support other formats or lower bitrates?
     opts = {
         "format": "bestaudio[ext=m4a]/bestaudio/best",
         "outtmpl": str(base_path / file_path) + ".%(ext)s",
