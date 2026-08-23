@@ -53,6 +53,7 @@ source-include = ["*.templates"]
 
 [dependency-groups]
 dev = [
+  "bandit>=1.9.4",
   "basedpyright>=1.39.10",
   "django-browser-reload>=1.21.0",
   "django-debug-toolbar>=7.1.1",

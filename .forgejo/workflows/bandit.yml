@@ -1,0 +1,18 @@
+name: Test
+on: [push, pull_request]
+
+jobs:
+  tests:
+    runs-on: nix
+    steps:
+      - uses: actions/checkout@v7
+      - name: Configure Nix
+        run: |
+          cat >> /etc/nix/nix.conf <<'EOF'
+          experimental-features = nix-command flakes
+          extra-substituters = https://devenv.cachix.org
+          extra-trusted-public-keys = devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=
+          EOF
+      - name: Install devenv
+        run: nix profile install nixpkgs#devenv
+      - run: devenv --no-tui shell run_bandit

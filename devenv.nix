@@ -78,6 +78,12 @@ in
     '';
   };
 
+  scripts.run_bandit = {
+    exec = ''
+      uv run bandit -r src/
+    '';
+  };
+
   processes.web = {
     exec = ''
       web
