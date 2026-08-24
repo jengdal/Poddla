@@ -1,6 +1,21 @@
-on: [push]
+name: Test
+on: [push, pull_request]
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  tests:
+    runs-on: nix
     steps:
-      - run: echo "CI is working"
+      - uses: actions/checkout@v7
+      - uses: ./.forgejo/actions/setup-devenv
+      - name: Write test .env
+        run: |
+          cat > .env <<'EOF'
+          SECRET_KEY=ci-test-secret-key
+          DEBUG=True
+          DATABASE_URL=sqlite:///db.sqlite3
+          ALLOWED_HOSTS=localhost,127.0.0.1,::1
+          VALKEY_PORT=7788
+          VALKEY_HOST=127.0.0.1
+          MEDIA_ROOT=/tmp/media
+          EOF
+      - run: devenv --no-tui test
