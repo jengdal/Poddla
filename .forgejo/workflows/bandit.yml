@@ -8,6 +8,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Configure Nix
         run: |
+          # NOTE: In my case this runs in a docker based runner that uses the hosts nix store.
+          #       The host will also need to trust these caches for them to be used.
           cat >> /etc/nix/nix.conf <<'EOF'
           experimental-features = nix-command flakes
           extra-substituters = https://nix-community.cachix.org https://devenv.cachix.org https://nixpkgs-python.cachix.org
@@ -16,14 +18,4 @@ jobs:
           EOF
       - name: Install devenv
         run: nix profile install nixpkgs#devenv
-      # - name: Debug substituter and local store
-      #   run: |
-      #     echo "--- network reachability to nixpkgs-python.cachix.org ---"
-      #     curl -v -o /dev/null https://nixpkgs-python.cachix.org/45dgd81avghmnzmab82qls6qzaaqp81n.narinfo 2>&1 | tail -40
-      #     echo "--- is the derivation already in the local store? ---"
-      #     nix path-info /nix/store/45dgd81avghmnzmab82qls6qzaaqp81n-python3-3.14.6 2>&1 || true
-      #     ls -la /nix/store/ 2>&1 | grep 45dgd81avghmnzmab82qls6qzaaqp81n || echo "not present locally"
-      #     echo "--- raw nix substitution attempt, bypassing devenv entirely ---"
-      #     nix build --dry-run --extra-experimental-features "nix-command flakes" \
-      #       'github:cachix/nixpkgs-python/4d2bd16c09baaa04f4045f16f6a5574654aaba16#packages.x86_64-linux."3.14"' -vvv 2>&1 | tail -60
       - run: devenv --no-tui shell run_bandit
