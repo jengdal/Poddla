@@ -84,6 +84,8 @@ in
     '';
   };
 
+  # Run with `devenv test`.
+  # devenv will start the needed processes.
   enterTest = ''
     if [ -f .env ]; then
       set -a
