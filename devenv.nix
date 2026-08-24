@@ -84,6 +84,16 @@ in
     '';
   };
 
+  enterTest = ''
+    if [ -f .env ]; then
+      set -a
+      source .env
+      set +a
+    fi
+    wait_for_port "$VALKEY_PORT"
+    manage test -v 2
+  '';
+
   processes.web = {
     exec = ''
       web
