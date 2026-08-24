@@ -69,7 +69,7 @@ in
         source .env
         set +a
       fi
-      uv run uvicorn --port 8000 --timeout-graceful-shutdown 0 \
+      uv run uvicorn --port 8000 --host 0.0.0.0 --timeout-graceful-shutdown 0 \
               --reload --reload-dir src \
               --reload-include '**/*.html' \
               --reload-include '**/*.css' \
