@@ -17,3 +17,6 @@ runs:
     - name: Install devenv
       shell: bash
       run: nix profile install nixpkgs#devenv
+    - name: Init devenv
+      shell: bash
+      run: devenv shell --no-tui /bin/true
