@@ -24,6 +24,11 @@ buildNpmPackage {
   # Skip canvas's node-gyp build (canvas is a jsdom optional dep, never imported in source)
   npmFlags = [ "--ignore-scripts" ];
 
+  # devDependencies (eslint, typescript, prettier, swc-node, ...) are only used for
+  # linting/compiling — irrelevant here since dontNpmBuild = true means we never
+  # compile or lint, we just run the TypeScript source directly via Deno.
+  npmInstallFlags = [ "--omit=dev" ];
+
   # bgutil runs as TypeScript via Deno — no tsc compile step needed
   dontNpmBuild = true;
 
