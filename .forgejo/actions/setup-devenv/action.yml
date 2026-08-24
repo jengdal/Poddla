@@ -16,7 +16,28 @@ runs:
         EOF
     - name: Install devenv
       shell: bash
-      run: nix profile install nixpkgs#devenv
+      run: nix profile install nixpkgs#devenv nixpkgs#gnutar nixpkgs#gzip
+    - name: Cache nix eval cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/nix
+        key: nix-eval-cache-${{ hashFiles('devenv.lock', 'devenv.nix', 'devenv.yaml') }}
+        restore-keys: |
+          nix-eval-cache-
+    - name: Cache python venv
+      uses: actions/cache@v4
+      with:
+        path: .devenv/state/venv
+        key: devenv-venv-${{ hashFiles('devenv.lock', 'devenv.nix', 'devenv.yaml', 'uv.lock') }}
+        restore-keys: |
+          devenv-venv-
+    - name: Cache python test venv
+      uses: actions/cache@v4
+      with:
+        path: .devenv/test-state/venv
+        key: devenv-test-venv-${{ hashFiles('devenv.lock', 'devenv.nix', 'devenv.yaml', 'uv.lock') }}
+        restore-keys: |
+          devenv-test-venv-
     - name: Init devenv
       shell: bash
       run: devenv shell --no-tui /bin/true
