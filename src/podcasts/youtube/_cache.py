@@ -18,7 +18,7 @@ async def run_cached(
     if cached is not None:
         try:
             return msgspec.msgpack.decode(cached)
-        except Exception:
+        except msgspec.DecodeError:
             pass
     info = await asyncio.to_thread(sync_fn)
     await vk.set(
