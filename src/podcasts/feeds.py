@@ -45,7 +45,7 @@ class PodcastRssFeed(Rss201rev2Feed):
             handler.addQuickElement("itunes:duration", duration)
         if summary := item.get("itunes_summary"):
             handler.addQuickElement("itunes:summary", summary)
-            handler.addQuickElement("content:encoded", summary)
+            handler._write(f"<content:encoded><![CDATA[{summary}]]></content:encoded>")
         if image := item.get("itunes_image"):
             handler.startElement("itunes:image", {"href": image})
             handler.endElement("itunes:image")
