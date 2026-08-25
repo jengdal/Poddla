@@ -39,6 +39,6 @@ runs:
         key: devenv-test-venv-${{ hashFiles('devenv.lock', 'devenv.nix', 'devenv.yaml', 'uv.lock') }}
         restore-keys: |
           devenv-test-venv-
-    - name: Init devenv
-      shell: bash
-      run: devenv shell --no-tui /bin/true
+    # - name: Init devenv
+    #   shell: bash
+    #   run: devenv shell --no-tui /bin/true
