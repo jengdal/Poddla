@@ -17,22 +17,23 @@ runs:
     - name: Install devenv
       shell: bash
       run: nix profile install nixpkgs#devenv nixpkgs#gnutar nixpkgs#gzip
+    # actions/cache new releases/commits: https://github.com/actions/cache/releases
     - name: Cache nix eval cache
-      uses: actions/cache@v4
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/nix
         key: nix-eval-cache-${{ hashFiles('devenv.lock', 'devenv.nix', 'devenv.yaml') }}
         restore-keys: |
           nix-eval-cache-
     - name: Cache python venv
-      uses: actions/cache@v4
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: .devenv/state/venv
         key: devenv-venv-${{ hashFiles('devenv.lock', 'devenv.nix', 'devenv.yaml', 'uv.lock') }}
         restore-keys: |
           devenv-venv-
     - name: Cache python test venv
-      uses: actions/cache@v4
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: .devenv/test-state/venv
         key: devenv-test-venv-${{ hashFiles('devenv.lock', 'devenv.nix', 'devenv.yaml', 'uv.lock') }}

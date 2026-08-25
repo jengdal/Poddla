@@ -5,7 +5,8 @@ jobs:
   tests:
     runs-on: nix
     steps:
-      - uses: actions/checkout@v7
+      # new releases/commits: https://github.com/actions/checkout/releases
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.forgejo/actions/setup-devenv
       - name: Write test .env
         run: |
