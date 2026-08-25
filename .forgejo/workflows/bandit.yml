@@ -2,7 +2,7 @@ name: Bandit
 on: [push, pull_request]
 
 jobs:
-  tests:
+  bandit:
     runs-on: nix
     steps:
       # new releases/commits: https://github.com/actions/checkout/releases
