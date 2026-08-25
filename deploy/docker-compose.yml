@@ -1,0 +1,61 @@
+services:
+  poddla:
+    image: poddla:latest
+    environment:
+      VALKEY_HOST: valkey
+      VALKEY_PORT: "6379"
+      # CHANGE before deploying for real:
+      # Use eg: `python -c "import secrets; print(secrets.token_urlsafe(50))":
+      SECRET_KEY: "changeme-generate-a-real-secret-key"
+      # CHANGE this and SITE_ADDRESS below:
+      ALLOWED_HOSTS: poddla.example.com
+      # CHANGE this too (include https:// or http://):
+      CSRF_TRUSTED_ORIGINS: https://poddla.example.com
+      # Set to True if we're behind a https proxy:
+      USE_HTTPS: "True"
+      DEBUG: "False"
+      DATABASE_URL: sqlite:////data/db/poddla.sqlite3
+      MEDIA_ROOT: /data/media
+    volumes:
+      # Metadata about the podcasts will be stored in a sqlite file located here:
+      - ./data/db:/data/db
+      # The downloaded audio will be stored here:
+      - ./data/media:/data/media
+      # Put poddla's static files (css, js, etc) on a named valume so that Caddy can mount and serve them, see below:
+      - poddla_static:/app/src/staticfiles
+    depends_on:
+      - valkey
+    restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:9.1.1
+    volumes:
+      - valkey_data:/data
+      # Use something like this if you want the valkey cache to be located along with the sqlite database and audio files:
+      # - ./data/valkey:/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.11.4
+    ports:
+      - "8080:8080"
+      # - "443:443"
+      # - "443:443/udp"
+    environment:
+      # See the Caddyfile:
+      SITE_ADDRESS: http://poddla:8080
+      # TRUSTED_PROXIES: 192.168.1.1/32
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - poddla_static:/srv/static:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - poddla
+    restart: unless-stopped
+
+volumes:
+  poddla_static:
+  valkey_data:
+  caddy_data:
+  caddy_config:

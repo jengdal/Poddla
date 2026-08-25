@@ -9,7 +9,7 @@
 let
   bgutil-server = pkgs.callPackage ./nix/bgutil-server.nix { };
 
-  docker = import ./docker.nix {
+  docker = import ./nix/docker.nix {
     inherit
       pkgs
       lib
@@ -152,6 +152,11 @@ in
 
   # Avoid building the python package from sources:
   cachix.pull = [ "nixpkgs-python" ];
+
+  # Build a docker image, see `docker.nix`.
+  outputs = {
+    inherit (docker) app poddla-image;
+  };
 
   # See full reference at https://devenv.sh/reference/options/
 }

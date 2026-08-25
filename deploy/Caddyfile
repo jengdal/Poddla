@@ -1,0 +1,10 @@
+{$SITE_ADDRESS}:8080 {
+	handle_path /static/* {
+		root * /srv/static
+		file_server
+	}
+
+	handle {
+		reverse_proxy poddla:8000
+	}
+}
