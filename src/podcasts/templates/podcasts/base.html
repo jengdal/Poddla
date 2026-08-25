@@ -14,13 +14,13 @@
     <script type="module" defer src="{% static 'vendor/datastar.js' %}"></script>
 
     <link rel="stylesheet" href="{% static 'styles.css' %}" />
-    <title>Youtube to Podcast</title>
+    <title>Poddla</title>
     {% block extra_head %}{% endblock extra_head %}
   </head>
   <body>
     <header class="app-header">
       <div class="app-header-inner">
-        <a href="{% url 'podcasts' %}" class="app-brand">Youtube to Podcast</a>
+        <a href="{% url 'podcasts' %}" class="app-brand">Poddla</a>
         <nav>
           <a href="{% url 'add_channel' %}" class="ui-button ui-outlined">Add Channel</a>
         </nav>

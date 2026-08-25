@@ -16,8 +16,8 @@ from django.views.decorators.http import require_POST
 from podcasts.forms import FeedForm
 from podcasts.models import Episode, PodcastFeed
 from podcasts.youtube import FeedSource, fetch_feed
-from youtube_to_podcast import valkey_client
-from youtube_to_podcast.state_store import StateStore
+from poddla import valkey_client
+from poddla.state_store import StateStore
 
 
 class AddChannelState(msgspec.Struct):

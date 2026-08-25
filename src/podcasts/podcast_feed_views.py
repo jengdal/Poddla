@@ -24,8 +24,8 @@ from glide import ConditionalChange, ExpirySet, ExpiryType
 
 from podcasts.models import Episode, PodcastFeed, podcast_publisher
 from podcasts.youtube.video import download_audio
-from youtube_to_podcast import valkey_client
-from youtube_to_podcast.state_store import StateStore
+from poddla import valkey_client
+from poddla.state_store import StateStore
 
 
 class PodcastFeedState(msgspec.Struct):

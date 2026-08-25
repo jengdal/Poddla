@@ -74,7 +74,7 @@ in
               --reload-include '**/*.html' \
               --reload-include '**/*.css' \
               --reload-include '**/*.js' \
-              youtube_to_podcast.asgi:application
+              poddla.asgi:application
     '';
   };
 

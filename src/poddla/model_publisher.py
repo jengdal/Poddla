@@ -36,7 +36,7 @@ class ModelPublisher:
             post_delete.connect(handler, sender=model, weak=False)
 
     async def _publish_async(self, pk=None) -> None:
-        from youtube_to_podcast import valkey_client
+        from poddla import valkey_client
 
         vk = await valkey_client.get_client()
         await self.publish(vk, pk=pk)

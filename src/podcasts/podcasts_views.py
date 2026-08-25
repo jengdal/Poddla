@@ -12,8 +12,8 @@ from django.http import HttpRequest, HttpResponse
 from django.template.loader import render_to_string
 
 from podcasts.models import PodcastFeed, podcast_publisher
-from youtube_to_podcast import valkey_client
-from youtube_to_podcast.state_store import StateStore
+from poddla import valkey_client
+from poddla.state_store import StateStore
 
 
 class PodcastsState(msgspec.Struct):

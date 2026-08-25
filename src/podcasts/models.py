@@ -3,7 +3,7 @@ from pathlib import Path
 from django.conf import settings
 from django.db import models
 
-from youtube_to_podcast.model_publisher import ModelPublisher
+from poddla.model_publisher import ModelPublisher
 
 podcast_publisher = ModelPublisher("podcasts:feed:updates")
 

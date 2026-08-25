@@ -10,7 +10,7 @@ from django.test import AsyncRequestFactory, TransactionTestCase, override_setti
 from podcasts.models import Episode, PodcastFeed, podcast_publisher
 from podcasts.podcast_feed_views import episode_media
 from podcasts.youtube.video import DownloadInfo
-from youtube_to_podcast import valkey_client
+from poddla import valkey_client
 
 
 def make_mock_download(*, delay: float = 0, call_counter: dict | None = None):
