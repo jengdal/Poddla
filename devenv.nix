@@ -7,7 +7,16 @@
 }:
 
 let
-  bgutil-server = pkgs.callPackage ./bgutil-server.nix { };
+  bgutil-server = pkgs.callPackage ./nix/bgutil-server.nix { };
+
+  docker = import ./docker.nix {
+    inherit
+      pkgs
+      lib
+      config
+      inputs
+      ;
+  };
 in
 
 {
