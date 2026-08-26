@@ -26,6 +26,7 @@ env = environ.Env(
     YOUTUBE_META_CACHE_SECONDS=(int, 3600),
     YOUTUBE_AUDIO_CACHE_SECONDS=(int, 3600),
     MEDIA_ROOT=(str, None),
+    STATIC_ROOT=(str, str(BASE_DIR / "staticfiles")),
     BGUTIL_SERVER_HOME=(str, ""),
 )
 environ.Env.read_env(BASE_DIR.parent / ".env")
@@ -159,7 +160,7 @@ STATICFILES_DIRS = [
 ]
 
 # Where collectstatic will put files for production:
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT = Path(env("STATIC_ROOT"))
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration

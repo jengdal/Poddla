@@ -21,10 +21,6 @@ dependencies = [
 requires = ["uv_build>=0.12.1,<0.13.0"]
 build-backend = "uv_build"
 
-# [build-system]
-# requires = ["setuptools"]
-# build-backend = "setuptools.build_meta"
-
 [tool.basedpyright]
 include = ["src"]
 exclude = ["**/node_modules", "**/__pycache__"]
@@ -37,16 +33,8 @@ exclude_dirs = [".venv"]
 namespace-packages = ["src/"]
 
 [tool.uv.build-backend]
-source-include = ["*.templates"]
-
-# [tool.setuptools]
-# package-dir = { "" = "src" }
-#
-# [tool.setuptools.packages.find]
-# where = ["src"]
-#
-# [tool.setuptools.package-data]
-# "example_app.templates" = ["**/*"]
+# Add all poddla django apps here:
+module-name = ["poddla", "podcasts"]
 
 [dependency-groups]
 dev = [

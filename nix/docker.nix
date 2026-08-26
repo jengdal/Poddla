@@ -20,8 +20,6 @@ let
 
       # Use uv2nix to build a venv based on our pyproject.toml and uv.lock.
       # We don't use `languages.python.import` so that we can run this on mac.
-      # TODO: Investigate if we don't need to copy `src/` manually below, but
-      #       instead rely on it being included from here.
       pythonWorkspace = inputs.uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ../.; };
       pythonOverlay = pythonWorkspace.mkPyprojectOverlay { sourcePreference = "wheel"; };
       pythonSet =
@@ -36,25 +34,14 @@ let
           );
       app = pythonSet.mkVirtualEnv "poddla-env" pythonWorkspace.deps.default;
 
-      # The Poddla sources.
-      appSrc = pkgsLinux.runCommand "poddla-src" { } ''
-        mkdir -p $out/app
-        cp -r ${../src} $out/app/src
-        chmod -R u+w $out/app/src
-      '';
-
       # Collect the static files separately.
       collectedStatic = pkgsLinux.runCommand "poddla-staticfiles" { } ''
-        mkdir -p build/app/src
-        cp -r ${appSrc}/app/src/. build/app/src/
-        chmod -R u+w build/app/src
-
         SECRET_KEY=nix-build-placeholder \
         MEDIA_ROOT=/tmp/build-media \
+        STATIC_ROOT=$out \
+        DJANGO_SETTINGS_MODULE=poddla.settings \
         DEBUG=False \
-        "${app}/bin/python" build/app/src/manage.py collectstatic --noinput
-
-        mv build/app/src/staticfiles $out
+        "${app}/bin/django-admin" collectstatic --noinput
       '';
 
       # uid 1000 -> "poddla", so the non-root container user resolves to a real user.
@@ -68,8 +55,8 @@ let
 
       poddlaProdEntrypoint = pkgsLinux.writeShellScriptBin "poddla-prod-entrypoint" ''
         set -euo pipefail
-        "${app}/bin/python" src/manage.py migrate --noinput
-        exec "${app}/bin/uvicorn" --app-dir src --port 8000 --host 0.0.0.0 \
+        "${app}/bin/django-admin" migrate --noinput
+        exec "${app}/bin/uvicorn" --port 8000 --host 0.0.0.0 \
                 --timeout-graceful-shutdown 0 \
                 poddla.asgi:application
       '';
@@ -88,22 +75,23 @@ let
 
         contents = [
           app
-          appSrc
           poddlaEtc
           pkgsLinux.deno
           pkgsLinux.dockerTools.caCertificates
         ];
 
         # 1. We need a writeable `$HOME/.cache/` for yt-dlp and deno, we use /tmp for home and make it writeable.
-        # 2. app/src/staticfiles would otherwise be a symlink into the nix store. We replace it with a real
-        #    copy of collectedStatic so that it's reachable by other images at its expected path. At the time
-        #    of writing Caddy (from the compose file) needs to access it, via a shared docker volume.
+        # 2. /staticfiles is where Caddy (from the compose file) expects to find static files, via a shared
+        #    docker volume. We put a real copy of collectedStatic there - a symlink into the nix store
+        #    wouldn't be reachable from other images.
         fakeRootCommands = ''
           mkdir -p tmp
           chmod 1777 tmp
 
-          rm -rf app/src/staticfiles
-          cp -r --dereference ${collectedStatic} app/src/staticfiles
+          # WorkingDir below, otherwise never created on disk.
+          mkdir -p app
+
+          cp -r --dereference ${collectedStatic} staticfiles
         '';
 
         config = {
@@ -115,6 +103,7 @@ let
             "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
             "HOME=/tmp"
             "BGUTIL_SERVER_HOME=${bgutil-server-linux}"
+            "DJANGO_SETTINGS_MODULE=poddla.settings"
           ];
         };
       };

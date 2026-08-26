@@ -22,7 +22,7 @@ services:
       # The downloaded audio will be stored here:
       - ./data/media:/data/media
       # Put poddla's static files (css, js, etc) on a named valume so that Caddy can mount and serve them, see below:
-      - poddla_static:/app/src/staticfiles
+      - poddla_static:/staticfiles
     depends_on:
       - valkey
     restart: unless-stopped
