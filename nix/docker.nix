@@ -1,5 +1,6 @@
 # Build a Poddla docker image using the same software we use in the devenv. The nix docker
-# tools should be good at producing layered, efficient images.
+# tools are good at producing layered, efficient images. It produces one layer per nix
+# derivation. Even the python packages, including poddla itself gets their own layers.
 {
   pkgs,
   lib,
