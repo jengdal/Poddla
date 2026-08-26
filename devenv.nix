@@ -7,14 +7,16 @@
 }:
 
 let
+  pythonPackageName = "python314";
+
   bgutil-server = pkgs.callPackage ./nix/bgutil-server.nix { };
 
   docker = import ./nix/docker.nix {
     inherit
       pkgs
       lib
-      config
       inputs
+      pythonPackageName
       ;
   };
 in
@@ -42,7 +44,7 @@ in
   languages = {
     python = {
       enable = true;
-      version = "3.14";
+      package = pkgs.${pythonPackageName};
       lsp.package = pkgs.basedpyright;
       uv = {
         enable = true;

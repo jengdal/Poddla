@@ -3,8 +3,8 @@
 {
   pkgs,
   lib,
-  config,
   inputs,
+  pythonPackageName,
 }:
 
 let
@@ -26,7 +26,7 @@ let
       pythonOverlay = pythonWorkspace.mkPyprojectOverlay { sourcePreference = "wheel"; };
       pythonSet =
         (pkgsLinux.callPackage inputs.pyproject-nix.build.packages {
-          python = inputs.nixpkgs-python.packages.${linuxSystem}.${config.languages.python.version};
+          python = pkgsLinux.${pythonPackageName};
         }).overrideScope
           (
             lib.composeManyExtensions [
