@@ -32,6 +32,7 @@ in
     pkgs.statix
     pkgs.nixfmt
     pkgs.valkey
+    pkgs.jq
 
     # For yt-dlp:
     pkgs.deno
@@ -90,6 +91,43 @@ in
   scripts.run_bandit = {
     exec = ''
       uv run bandit -r src/
+    '';
+  };
+
+  # Build both arch images (see `docker.nix`) and publish them to the registry as one
+  # multi-arch tag. Usage: `devenv shell docker-publish [tag]` (defaults to `latest`).
+  # Reads DOCKER_REGISTRY_IMAGE from .env (see .env.example). Assumes you've already
+  # run `docker login forgejo.example.com`.
+  scripts.docker-publish = {
+    exec = ''
+      set -euo pipefail
+
+      if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+      fi
+
+      REGISTRY_IMAGE="''${DOCKER_REGISTRY_IMAGE:?DOCKER_REGISTRY_IMAGE is not set (see .env.example)}"
+      TAG="''${1:-latest}"
+
+      publish_arch() {
+        local arch="$1" output="$2"
+        echo "Building $arch image..."
+        local store_path
+        store_path=$(devenv build "outputs.$output" | jq -r ".\"outputs.$output\"")
+        docker load < "$store_path"
+        docker tag poddla:latest "$REGISTRY_IMAGE:$TAG-$arch"
+        docker push "$REGISTRY_IMAGE:$TAG-$arch"
+      }
+
+      publish_arch amd64 poddla-image-amd64
+      publish_arch arm64 poddla-image-arm64
+
+      docker manifest create "$REGISTRY_IMAGE:$TAG" \
+        --amend "$REGISTRY_IMAGE:$TAG-amd64" \
+        --amend "$REGISTRY_IMAGE:$TAG-arm64"
+      docker manifest push "$REGISTRY_IMAGE:$TAG"
     '';
   };
 
@@ -155,7 +193,7 @@ in
 
   # Build a docker image, see `docker.nix`.
   outputs = {
-    inherit (docker) app poddla-image;
+    inherit (docker) poddla-image-amd64 poddla-image-arm64;
   };
 
   # See full reference at https://devenv.sh/reference/options/
