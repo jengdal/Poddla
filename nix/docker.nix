@@ -84,6 +84,7 @@ let
       poddla-image = pkgsLinux.dockerTools.buildLayeredImage {
         name = "poddla";
         tag = "latest";
+        maxLayers = 127;
 
         contents = [
           app
