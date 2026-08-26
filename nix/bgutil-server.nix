@@ -32,9 +32,23 @@ buildNpmPackage {
   # bgutil runs as TypeScript via Deno — no tsc compile step needed
   dontNpmBuild = true;
 
+  # Everything here is imported as a library by Deno, never invoked as a standalone CLI. But
+  # `npm install` (via buildNpmPackage's own install hook, not stdenv's fixupPhase — so
+  # dontPatchShebangs doesn't reach it) rewrites a handful of unrelated deps' bin scripts to an
+  # absolute nodejs shebang regardless of --ignore-scripts. That ends up the *only* nix reference
+  # this derivation has, which drags a whole nodejs+icu4c+gtest closure into the production image
+  # (docker.nix pulls in whatever bgutil-server references via BGUTIL_SERVER_HOME) for scripts
+  # nothing calls. Drop the unused node_modules/.bin shims and neutralize any leftover absolute
+  # nodejs shebangs on the underlying files (e.g. node-addon-api/tools/conversion.js, which isn't
+  # even exposed via .bin) so no unused nodejs reference survives.
+  dontPatchShebangs = true;
+
   installPhase = ''
     mkdir -p $out
     cp -r src types node_modules package.json deno.json deno.lock tsconfig.json $out/
+    rm -rf $out/node_modules/.bin
+    grep -rl '^#!.*/bin/node$' $out/node_modules 2>/dev/null \
+      | xargs -r sed -i '1s|^#!.*/bin/node$|#!/usr/bin/env node|'
   '';
 
   meta = with lib; {
