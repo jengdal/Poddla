@@ -190,9 +190,6 @@ in
     fi
   '';
 
-  # Avoid building the python package from sources:
-  cachix.pull = [ "nixpkgs-python" ];
-
   # Build a docker image, see `docker.nix`.
   outputs = {
     inherit (docker) poddla-image-amd64 poddla-image-arm64;
