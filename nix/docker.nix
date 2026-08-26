@@ -36,16 +36,25 @@ let
           );
       app = pythonSet.mkVirtualEnv "poddla-env" pythonWorkspace.deps.default;
 
-      # The Poddla sources and static files.
+      # The Poddla sources.
       appSrc = pkgsLinux.runCommand "poddla-src" { } ''
         mkdir -p $out/app
         cp -r ${../src} $out/app/src
         chmod -R u+w $out/app/src
+      '';
+
+      # Collect the static files separately.
+      collectedStatic = pkgsLinux.runCommand "poddla-staticfiles" { } ''
+        mkdir -p build/app/src
+        cp -r ${appSrc}/app/src/. build/app/src/
+        chmod -R u+w build/app/src
 
         SECRET_KEY=nix-build-placeholder \
         MEDIA_ROOT=/tmp/build-media \
         DEBUG=False \
-        "${app}/bin/python" $out/app/src/manage.py collectstatic --noinput
+        "${app}/bin/python" build/app/src/manage.py collectstatic --noinput
+
+        mv build/app/src/staticfiles $out
       '';
 
       # uid 1000 -> "poddla", so the non-root container user resolves to a real user.
@@ -85,15 +94,15 @@ let
         ];
 
         # 1. We need a writeable `$HOME/.cache/` for yt-dlp and deno, we use /tmp for home and make it writeable.
-        # 2. The static files are actually in the nix store and symlinked to app/src/staticfiles. We move them
-        #    there for real so that they're reachable by other images at their expected path. At the time of
-        #    writing Caddy (from the compose file) needs to access them.
+        # 2. app/src/staticfiles would otherwise be a symlink into the nix store. We replace it with a real
+        #    copy of collectedStatic so that it's reachable by other images at its expected path. At the time
+        #    of writing Caddy (from the compose file) needs to access it, via a shared docker volume.
         fakeRootCommands = ''
           mkdir -p tmp
           chmod 1777 tmp
 
           rm -rf app/src/staticfiles
-          cp -r --dereference ${appSrc}/app/src/staticfiles app/src/staticfiles
+          cp -r --dereference ${collectedStatic} app/src/staticfiles
         '';
 
         config = {
