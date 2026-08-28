@@ -26,14 +26,21 @@ class ModelPublisher:
         pub/sub. For bulk updates, call publisher.publish(vk) explicitly.
         """
         from asgiref.sync import async_to_sync
+        from django.db import transaction
         from django.db.models.signals import post_delete, post_save
 
-        def handler(sender, instance, **kwargs):
-            async_to_sync(self._publish_async)(pk=instance.pk)
+        def handler(sender, instance, raw=False, **kwargs):
+            if raw:
+                # Loaddata etc.
+                return
+            # Django clears instance.pk on deletes, after the transaction commits. Keep track of it here:
+            pk = instance.pk
+            transaction.on_commit(lambda: async_to_sync(self._publish_async)(pk=pk), robust=True)
 
+        uid = f"model_publisher:{self._channel_name}"
         for model in model_classes:
-            post_save.connect(handler, sender=model, weak=False)
-            post_delete.connect(handler, sender=model, weak=False)
+            post_save.connect(handler, sender=model, weak=False, dispatch_uid=uid)
+            post_delete.connect(handler, sender=model, weak=False, dispatch_uid=uid)
 
     async def _publish_async(self, pk=None) -> None:
         from poddla import valkey_client
