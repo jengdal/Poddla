@@ -1,24 +1,43 @@
 import asyncio
 import tempfile
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
 from django.test import AsyncRequestFactory, TransactionTestCase, override_settings
 
-from podcasts.models import Episode, PodcastFeed, podcast_publisher
+from podcasts import downloader
+from podcasts.models import Episode, EpisodeDownload, PodcastFeed, podcast_publisher
 from podcasts.podcast_feed_views import episode_media
 from podcasts.youtube.video import DownloadInfo
 from poddla import valkey_client
 
 
-def make_mock_download(*, delay: float = 0, call_counter: dict | None = None):
+@asynccontextmanager
+async def running_downloader():
+    """Starts the podcasts.downloader for the duration of a test."""
+    downloader.start()
+    try:
+        yield
+    finally:
+        await downloader.stop()
+
+
+def make_mock_download(
+    *,
+    delay: float = 0,
+    call_counter: dict | None = None,
+    error: Exception | None = None,
+):
     def _download(url: str, base_path: Path, file_path: Path) -> DownloadInfo:
         if call_counter is not None:
             call_counter["n"] += 1
         if delay:
             time.sleep(delay)
+        if error is not None:
+            raise error
         actual = (base_path / file_path).with_suffix(".mp3")
         actual.parent.mkdir(parents=True, exist_ok=True)
         actual.write_bytes(b"fake audio")
@@ -56,9 +75,10 @@ class EpisodeMediaTests(TransactionTestCase):
 
     async def test_single_request_downloads_and_serves(self):
         req = self.factory.get(f"/e/{self.episode.pk}/media/")
-        with patch("podcasts.podcast_feed_views.download_audio", make_mock_download()):
-            with override_settings(MEDIA_ROOT=str(self.media_root)):
-                response = await episode_media(req, self.episode.pk)
+        async with running_downloader():
+            with patch("podcasts.downloader.download_audio", make_mock_download()):
+                with override_settings(MEDIA_ROOT=str(self.media_root)):
+                    response = await episode_media(req, self.episode.pk)
 
         self.assertIn(response.status_code, (200, 206))
         await self.episode.arefresh_from_db()
@@ -67,16 +87,17 @@ class EpisodeMediaTests(TransactionTestCase):
     async def test_concurrent_requests_download_once(self):
         req = self.factory.get(f"/e/{self.episode.pk}/media/")
         counter: dict = {"n": 0}
-        with patch(
-            "podcasts.podcast_feed_views.download_audio",
-            make_mock_download(delay=0.5, call_counter=counter),
-        ):
-            with override_settings(MEDIA_ROOT=str(self.media_root)):
-                r1, r2, r3 = await asyncio.gather(
-                    episode_media(req, self.episode.pk),
-                    episode_media(req, self.episode.pk),
-                    episode_media(req, self.episode.pk),
-                )
+        async with running_downloader():
+            with patch(
+                "podcasts.downloader.download_audio",
+                make_mock_download(delay=0.5, call_counter=counter),
+            ):
+                with override_settings(MEDIA_ROOT=str(self.media_root)):
+                    r1, r2, r3 = await asyncio.gather(
+                        episode_media(req, self.episode.pk),
+                        episode_media(req, self.episode.pk),
+                        episode_media(req, self.episode.pk),
+                    )
 
         self.assertEqual(counter["n"], 1)
         self.assertIn(r1.status_code, (200, 206))
@@ -92,12 +113,13 @@ class EpisodeMediaTests(TransactionTestCase):
 
         req = self.factory.get(f"/e/{self.episode.pk}/media/")
         counter: dict = {"n": 0}
-        with patch(
-            "podcasts.podcast_feed_views.download_audio",
-            make_mock_download(call_counter=counter),
-        ):
-            with override_settings(MEDIA_ROOT=str(self.media_root)):
-                response = await episode_media(req, self.episode.pk)
+        async with running_downloader():
+            with patch(
+                "podcasts.downloader.download_audio",
+                make_mock_download(call_counter=counter),
+            ):
+                with override_settings(MEDIA_ROOT=str(self.media_root)):
+                    response = await episode_media(req, self.episode.pk)
 
         self.assertEqual(counter["n"], 0)
         self.assertIn(response.status_code, (200, 206))
@@ -111,20 +133,103 @@ class EpisodeMediaTests(TransactionTestCase):
             channel, callback=lambda msg, ctx: ctx.set(), context=done
         )
         try:
-            with patch("podcasts.podcast_feed_views.download_audio", make_mock_download(delay=0.3)):
+            async with running_downloader():
+                with patch(
+                    "podcasts.downloader.download_audio", make_mock_download(delay=0.3)
+                ):
+                    with override_settings(MEDIA_ROOT=str(self.media_root)):
+                        task = asyncio.create_task(episode_media(req, self.episode.pk))
+                        await asyncio.sleep(
+                            0.05
+                        )  # let it create the EpisodeDownload row and start waiting
+                        task.cancel()
+                        try:
+                            await task
+                        except asyncio.CancelledError:
+                            pass
+
+                        # The download is owned by the downloader singleton, not the cancelled
+                        # request — wait for asave() to fire the pub/sub signal.
+                        await asyncio.wait_for(done.wait(), timeout=5)
+        finally:
+            await subscriber.close()
+
+        await self.episode.arefresh_from_db()
+        self.assertIsNotNone(self.episode.file_path)
+
+    async def test_failed_download_is_retried_on_next_request(self):
+        req = self.factory.get(f"/e/{self.episode.pk}/media/")
+
+        # First attempt fails — the EpisodeDownload row should end up "failed".
+        async with running_downloader():
+            with patch(
+                "podcasts.downloader.download_audio",
+                make_mock_download(error=RuntimeError("boom")),
+            ):
                 with override_settings(MEDIA_ROOT=str(self.media_root)):
                     task = asyncio.create_task(episode_media(req, self.episode.pk))
-                    await asyncio.sleep(0.05)  # let it acquire the lock and start the background task
+                    for _ in range(50):
+                        download = await EpisodeDownload.objects.filter(
+                            episode=self.episode
+                        ).afirst()
+                        if (
+                            download is not None
+                            and download.status == EpisodeDownload.STATUS_FAILED
+                        ):
+                            break
+                        await asyncio.sleep(0.1)
+                    else:
+                        self.fail("EpisodeDownload never reached status=failed")
                     task.cancel()
                     try:
                         await task
                     except asyncio.CancelledError:
                         pass
 
-                    # _download_and_save is still running; wait for asave() to fire the pub/sub signal
-                    await asyncio.wait_for(done.wait(), timeout=5)
-        finally:
-            await subscriber.close()
+        self.assertEqual(download.status, EpisodeDownload.STATUS_FAILED)
 
-        await self.episode.arefresh_from_db()
-        self.assertIsNotNone(self.episode.file_path)
+        # Second attempt succeeds — episode_media should reset the row to pending
+        # and the singleton should pick it up again.
+        async with running_downloader():
+            with (
+                patch("podcasts.downloader.download_audio", make_mock_download()),
+                override_settings(MEDIA_ROOT=str(self.media_root)),
+            ):
+                response = await episode_media(req, self.episode.pk)
+
+            self.assertIn(response.status_code, (200, 206))
+            await self.episode.arefresh_from_db()
+            self.assertIsNotNone(self.episode.file_path)
+
+            # episode_media returns as soon as the episode's file_path is saved, which
+            # happens slightly before the downloader deletes the now-finished row —
+            # give it a moment to finish that cleanup before the singleton is stopped.
+            for _ in range(50):
+                if not await EpisodeDownload.objects.filter(
+                    episode=self.episode
+                ).aexists():
+                    break
+                await asyncio.sleep(0.1)
+            else:
+                self.fail(
+                    "EpisodeDownload row was never cleaned up after a successful download"
+                )
+
+    async def test_concurrent_requests_create_single_download_row(self):
+        req = self.factory.get(f"/e/{self.episode.pk}/media/")
+        async with running_downloader():
+            with patch(
+                "podcasts.downloader.download_audio",
+                make_mock_download(delay=0.3),
+            ):
+                with override_settings(MEDIA_ROOT=str(self.media_root)):
+                    await asyncio.gather(
+                        episode_media(req, self.episode.pk),
+                        episode_media(req, self.episode.pk),
+                    )
+
+        # The unique constraint on EpisodeDownload.episode means at most one row
+        # could ever have existed for this episode, regardless of the race above.
+        self.assertLessEqual(
+            await EpisodeDownload.objects.filter(episode=self.episode).acount(), 1
+        )

@@ -6,6 +6,7 @@ from django.db import models
 from poddla.model_publisher import ModelPublisher
 
 podcast_publisher = ModelPublisher("podcasts:feed:updates")
+download_publisher = ModelPublisher("download:updates")
 
 
 class PublicPodcastManager(models.Manager):
@@ -87,5 +88,33 @@ class Episode(models.Model):
         ]
 
 
+class EpisodeDownload(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_DOWNLOADING = "downloading"
+    STATUS_FAILED = "failed"
+    # - When a download is queued and waiting to be downloaded, its status is PENDING.
+    # - When it's downloading the status is DOWNLOADING.
+    # - When it's failed the download it's FAILED.
+    # - When it's succeeded the row is deleted. The Episode itself will contain the
+    #   file path to the audio file.
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_DOWNLOADING, "Downloading"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    episode = models.ForeignKey(Episode, on_delete=models.CASCADE, related_name="downloads")
+    index = models.IntegerField(default=0)
+    created_at = models.DateTimeField(null=False, auto_now_add=True)
+    status = models.CharField(max_length=18, choices=STATUS_CHOICES, default=STATUS_PENDING)
+
+    class Meta:
+        ordering = ["index", "created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["episode"], name="unique_download_per_episode")
+        ]
+
+
+download_publisher.register(EpisodeDownload)
 podcast_publisher.register(PodcastFeed)
 podcast_publisher.register(Episode)

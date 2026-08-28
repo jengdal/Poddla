@@ -12,11 +12,20 @@ async def application(scope, receive, send):
         while True:
             message = await receive()
             if message["type"] == "lifespan.startup":
+                from podcasts import downloader
+
+                # NOTE: If you want to run multiple web worker processes, you should move the
+                #       downloader to its own process, it will have problems if you run multiple
+                #       instances of it.
+                downloader.start()
+
                 await send({"type": "lifespan.startup.complete"})
             elif message["type"] == "lifespan.shutdown":
                 # Add any global cleanup calls here.
+                from podcasts import downloader
                 from poddla import valkey_client
 
+                await downloader.stop()
                 await valkey_client.close_client()
                 await send({"type": "lifespan.shutdown.complete"})
                 return

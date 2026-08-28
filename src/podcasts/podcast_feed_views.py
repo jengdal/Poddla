@@ -10,7 +10,6 @@ from datastar_py.django import (
     DatastarResponse,
     read_signals,
 )
-from django.conf import settings
 from django.http import (
     FileResponse,
     Http404,
@@ -20,10 +19,14 @@ from django.http import (
 )
 from django.shortcuts import aget_object_or_404
 from django.template.loader import render_to_string
-from glide import ConditionalChange, ExpirySet, ExpiryType
 
-from podcasts.models import Episode, PodcastFeed, podcast_publisher
-from podcasts.youtube.video import download_audio
+from podcasts.models import (
+    Episode,
+    EpisodeDownload,
+    PodcastFeed,
+    download_publisher,
+    podcast_publisher,
+)
 from poddla import valkey_client
 from poddla.state_store import StateStore
 
@@ -121,8 +124,8 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
                 yield ServerSentEventGenerator.patch_elements(
                     html, event_id=str(event_id)
                 )
-                # Limit the FPS. When a lot of episodes are created we can get a lot of events at once and
-                # don't want to create a new "frame" for each one:
+                # Limit the FPS. When a lot of episodes are created we can get a lot of events at
+                # once and don't want to create a new "frame" for each one:
                 await asyncio.sleep(1.0 / max_fps)
                 await dirty.wait()
                 dirty.clear()
@@ -133,96 +136,70 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
     return DatastarResponse(content=generator())
 
 
-async def _download_and_save(episode: Episode, media_root: Path, lock_key: str) -> None:
-    vk = await valkey_client.get_client()
-    try:
-        rel_path = Path(str(episode.podcast_id)) / str(episode.id)
-        download_info = await asyncio.to_thread(
-            download_audio, episode.url, media_root, rel_path
-        )
-        episode.file_path = str(download_info.file_path.relative_to(media_root))
-        episode.published_at = download_info.published_at
-        episode.duration = download_info.duration
-        episode.show_notes = str(download_info.description or "")
-        # Use save instead of update so that we trigger the podcast_publisher automatically through the post_save signal
-        await episode.asave(
-            update_fields=(
-                "published_at",
-                "duration",
-                "show_notes",
-                "file_path",
-            )
-        )
-    finally:
-        await vk.delete([lock_key])
-
-
 async def episode_media(request: HttpRequest, episode_id: int):
-    """
-    This view serve episode audio.
+    """This view serve episode audio.
+
     - If the file already exists on our filesystem, it is served directly.
-    - If the file doesn't exist, it's downloaded first.
-    - When there are multiple simultaneous clients requesting the same
-      episode file, only the first client triggers a download, the others
-      wait until it's finished and they all get served the same file. See
-      the code and comments for more details.
-    - If a client disconnects mid-download from YT, the download continues.
+    - Else we tell the downloader it needs to download the file by creating
+      or updating a EpisodeDownload row, and wait util the file has been
+      downloaded.
+    - Multiple simultaneous clients requesting the same file will wait for the
+      same download.
+    - If a client disconnects, the downloader will still complete the download.
     """
     episode = await aget_object_or_404(Episode, pk=episode_id)
-    media_root = Path(settings.MEDIA_ROOT)
-    lock_key = f"download:lock:{episode_id}"
+    episode_file = episode.file_exists()
+    if not episode_file:
+        download, created = await EpisodeDownload.objects.aget_or_create(
+            episode_id=episode_id
+        )
+        if not created and download.status == EpisodeDownload.STATUS_FAILED:
+            download.status = EpisodeDownload.STATUS_PENDING
+            # TODO: There's a race-condition here, another client might have changed it to pending
+            # already, and the downloader could even have finished it theoretically, very unlikely
+            # tho.
+            await download.asave(update_fields=["status"])
 
-    while True:
-        episode_file = episode.file_exists()
-        if episode_file:
-            break
+        event = asyncio.Event()
 
-        vk = await valkey_client.get_client()
-        acquired = await vk.set(
-            lock_key,
-            b"1",
-            conditional_set=ConditionalChange.ONLY_IF_DOES_NOT_EXIST,
-            expiry=ExpirySet(ExpiryType.SEC, 300),
+        def on_update(msg, ctx):
+            ctx.set()
+
+        download_sub = await valkey_client.create_subscriber(
+            download_publisher.channel_for(download.pk),
+            callback=on_update,
+            context=event,
         )
 
-        if acquired:
-            task = asyncio.create_task(
-                _download_and_save(episode, media_root, lock_key)
-            )
-            try:
-                await asyncio.shield(task)
-            except asyncio.CancelledError:
-                # Client disconnected — the task keeps running, holding the lock until done
-                raise
-            episode = await Episode.objects.aget(pk=episode_id)
-        else:
-            event = asyncio.Event()
-            channel = podcast_publisher.channel_for(episode.pk)
-
-            def on_update(msg, ctx):
-                ctx.set()
-
-            subscriber = await valkey_client.create_subscriber(
-                channel, callback=on_update, context=event
-            )
-            try:
-                # Check the episode again in case the download finished between the failed lock and now:
-                episode = await Episode.objects.aget(pk=episode_id)
+        try:
+            while True:
+                episode = await Episode.objects.aget(id=episode_id)
                 episode_file = episode.file_exists()
                 if episode_file:
                     break
                 try:
-                    # We wait until the other request has finished downloading the file, OR until 15 seconds has passed.
-                    # The max 15 second wait makes it so that we react to cancelled requests quicker, and get to restart from an active waiter.
-                    await asyncio.wait_for(event.wait(), timeout=15)
-                except asyncio.TimeoutError:
-                    pass
-            finally:
-                await subscriber.close()
+                    download = await EpisodeDownload.objects.aget(episode_id=episode_id)
+                except EpisodeDownload.DoesNotExist:
+                    # This could happen if the episode finished after we checked the episode file
+                    # but before we checked the download. The download row is deleted when the
+                    # download finishes. So, recheck immediately:
+                    continue
+                if download.status == EpisodeDownload.STATUS_FAILED:
+                    # We don't auto retry the download while waiting, the client will have to retry
+                    # the request.
+                    return HttpResponse(status=500)
+                # When the download status is PENDING or DOWNLOADING we continue the while loop.
 
-            episode = await Episode.objects.aget(pk=episode_id)
+                try:
+                    await asyncio.wait_for(event.wait(), timeout=60 * 10)
+                except TimeoutError:
+                    return HttpResponse(status=504)
+                event.clear()
 
-    # TODO: Use nginx to serve the file instead:
+        finally:
+            await download_sub.close()
+
+    # TODO: Use nginx or caddy to serve the file instead:
     return _serve_with_range(request, episode_file)
 
 
