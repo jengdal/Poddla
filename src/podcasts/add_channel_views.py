@@ -141,7 +141,8 @@ async def add_channel_sse(request: HttpRequest):
 
 @require_POST
 async def set_state(request: HttpRequest):
-    # We post using datastars "form" contentType, it leaves out signals so we use a tab_id input element instead:
+    # We post using datastars "form" contentType, it leaves out signals so we use a tab_id input
+    # element instead:
     tab_id = request.POST.get("tab_id", None)
     if not tab_id:
         # TODO: Add this to the state and show a toast error or something.

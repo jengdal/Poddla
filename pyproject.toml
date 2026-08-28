@@ -32,8 +32,21 @@ executionEnvironments = [{ root = "src" }]
 [tool.bandit]
 exclude_dirs = [".venv"]
 
+[tool.docformatter]
+recursive = true
+wrap-summaries = 100
+wrap-descriptions = 100
+
 [tool.ruff]
 namespace-packages = ["src/"]
+line-length = 100
+
+[tool.ruff.lint]
+# W505 warns about too long comments and docstrings.
+extend-select = ["W505"]
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 100
 
 [tool.uv.build-backend]
 # Add all poddla django apps here:
@@ -45,9 +58,9 @@ dev = [
   "django-browser-reload>=1.21.0",
   "django-debug-toolbar>=7.1.1",
   "django-extensions>=4.1",
+  "docformatter>=1.7.8",
   "ipython>=9.16.1",
   "ruff>=0.16.3",
-
   # This installs some additional dev dependencies, like watchfiles:
   "uvicorn[standard]>=0.52.3",
 ]

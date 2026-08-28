@@ -100,6 +100,14 @@ in
     '';
   };
 
+  # Wraps docstrings to 100 columns (see [tool.docformatter] in pyproject.toml).
+  # Plain `#` comments are not reflowed by any tool — ruff's W505 only flags them.
+  scripts.format_docstrings = {
+    exec = ''
+      uv run docformatter --in-place src/
+    '';
+  };
+
   # Build both arch images (see `docker.nix`) and publish them to the registry as one
   # multi-arch tag. Usage: `devenv shell docker-publish [tag]` (defaults to `latest`).
   # Reads DOCKER_REGISTRY_IMAGE from .env (see .env.example). Assumes you've already

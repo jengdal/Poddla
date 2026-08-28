@@ -1,5 +1,4 @@
-"""
-WSGI config for poddla project.
+"""WSGI config for poddla project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 

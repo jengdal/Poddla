@@ -85,8 +85,8 @@ async def podcasts_sse(request: HttpRequest):
                 yield ServerSentEventGenerator.patch_elements(
                     html, event_id=str(event_id)
                 )
-                # Limit the FPS. When a lot of episodes are created we can get a lot of events at once and
-                # don't want to create a new "frame" for each one:
+                # Limit the FPS. When a lot of episodes are created we can get a lot of events at
+                # once and don't want to create a new "frame" for each one:
                 await asyncio.sleep(1.0 / max_fps)
                 await dirty.wait()
                 dirty.clear()

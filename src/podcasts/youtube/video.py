@@ -14,7 +14,10 @@ class DownloadInfo(msgspec.Struct):
 
 
 def download_audio(url: str, base_path: Path, file_path: Path) -> DownloadInfo:
-    """Download best audio for a YouTube URL. Returns (filepath, DownloadInfo)."""
+    """Download best audio for a YouTube URL.
+
+    Returns (filepath, DownloadInfo).
+    """
     (base_path / file_path).parent.mkdir(parents=True, exist_ok=True)
     extractor_args: dict = {"youtube": {"player_client": ["mweb"]}}
     if bgutil_home := settings.BGUTIL_SERVER_HOME:
@@ -26,7 +29,8 @@ def download_audio(url: str, base_path: Path, file_path: Path) -> DownloadInfo:
         "no_warnings": True,
         "noprogress": True,
         "noplaylist": True,
-        # Don't keep .part files around when a download fails, we don't know if the part file is corrupt or even the same content anymore:
+        # Don't keep .part files around when a download fails, we don't know if the part file is
+        # corrupt or even the same content anymore:
         "keeppartial": False,
         "extractor_args": extractor_args,
     }

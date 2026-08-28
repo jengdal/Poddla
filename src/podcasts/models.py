@@ -28,9 +28,7 @@ class PodcastFeed(models.Model):
     SOURCE_PLAYLIST = "playlist"
     SOURCE_CHOICES = [(SOURCE_CHANNEL, "Channel"), (SOURCE_PLAYLIST, "Playlist")]
 
-    status = models.CharField(
-        max_length=16, choices=STATUS_CHOICES, default=STATUS_DRAFT
-    )
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_DRAFT)
 
     # TODO: Add a new `source` attribute if we're going to support hosts other than youtube
     source_type = models.CharField(max_length=16, choices=SOURCE_CHOICES, blank=True)
@@ -56,9 +54,7 @@ class PodcastFeed(models.Model):
 
 
 class Episode(models.Model):
-    podcast = models.ForeignKey(
-        PodcastFeed, on_delete=models.CASCADE, related_name="episodes"
-    )
+    podcast = models.ForeignKey(PodcastFeed, on_delete=models.CASCADE, related_name="episodes")
     # TODO: Do we need youtube_id?
     youtube_id = models.CharField(max_length=255)
     title = models.TextField()
