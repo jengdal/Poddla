@@ -6,7 +6,7 @@ from django.conf import settings
 
 from podcasts.models import EpisodeDownload, download_publisher
 from podcasts.youtube.video import download_audio
-from poddla import valkey_client
+from valkey_changes.changes import changes
 
 logger = logging.getLogger(__name__)
 
@@ -104,46 +104,37 @@ async def downloader() -> None:
     await _reset_stale_downloading()
 
     in_flight: dict[int, asyncio.Task] = {}
-    wake = asyncio.Event()
-    wake.set()  # do one pass immediately
 
-    def on_update(msg, ctx):
-        ctx.set()
+    # The loop below does a pass before it ever waits, so the first check happens immediately.
+    async with changes(download_publisher.subscribe()) as changed:
+        try:
+            while True:
+                for ed_id, task in list(in_flight.items()):
+                    if task.done():
+                        del in_flight[ed_id]
 
-    subscriber = await valkey_client.create_subscriber(
-        download_publisher.channel, callback=on_update, context=wake
-    )
-    try:
-        while True:
-            for ed_id, task in list(in_flight.items()):
-                if task.done():
-                    del in_flight[ed_id]
-
-            free_slots = MAX_CONCURRENT_DOWNLOADS - len(in_flight)
-            if free_slots > 0:
-                claimed = await _claim_next_batch(
-                    limit=free_slots, exclude_ids=list(in_flight.keys())
-                )
-                for ed in claimed:
-                    logger.debug(
-                        "Starting download task for episode %s (EpisodeDownload %s)",
-                        ed.episode_id,
-                        ed.id,
+                free_slots = MAX_CONCURRENT_DOWNLOADS - len(in_flight)
+                if free_slots > 0:
+                    claimed = await _claim_next_batch(
+                        limit=free_slots, exclude_ids=list(in_flight.keys())
                     )
-                    in_flight[ed.id] = asyncio.create_task(_process_download(ed))
+                    for ed in claimed:
+                        logger.debug(
+                            "Starting download task for episode %s (EpisodeDownload %s)",
+                            ed.episode_id,
+                            ed.id,
+                        )
+                        in_flight[ed.id] = asyncio.create_task(_process_download(ed))
 
-            try:
-                # We don't wait indefinitely. Make sure to check the tasks and the db periodically
-                # even if we received no notification.
-                await asyncio.wait_for(wake.wait(), timeout=MAX_CHANGE_WAIT)
-            except TimeoutError:
-                logger.debug("Rechecking EpisodeDownloads.")
-            wake.clear()
-    except asyncio.CancelledError:
-        for task in in_flight.values():
-            task.cancel()
-        if in_flight:
-            await asyncio.gather(*in_flight.values(), return_exceptions=True)
-        raise
-    finally:
-        await subscriber.close()
+                try:
+                    # We don't wait indefinitely. Make sure to check the tasks and the db
+                    # periodically even if we received no notification.
+                    await asyncio.wait_for(changed.wait(), timeout=MAX_CHANGE_WAIT)
+                except TimeoutError:
+                    logger.debug("Rechecking EpisodeDownloads.")
+        except asyncio.CancelledError:
+            for task in in_flight.values():
+                task.cancel()
+            if in_flight:
+                await asyncio.gather(*in_flight.values(), return_exceptions=True)
+            raise

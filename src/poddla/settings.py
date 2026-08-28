@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "podcasts",
+    "valkey_changes",
 ]
 
 if DEBUG:

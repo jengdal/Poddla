@@ -3,7 +3,7 @@ from pathlib import Path
 from django.conf import settings
 from django.db import models
 
-from poddla.model_publisher import ModelPublisher
+from valkey_changes.model_publisher import ModelPublisher
 
 podcast_publisher = ModelPublisher("podcasts:feed:updates")
 download_publisher = ModelPublisher("download:updates")

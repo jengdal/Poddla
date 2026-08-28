@@ -12,7 +12,8 @@ from podcasts import downloader
 from podcasts.models import Episode, EpisodeDownload, PodcastFeed, podcast_publisher
 from podcasts.podcast_feed_views import episode_media
 from podcasts.youtube.video import DownloadInfo
-from poddla import valkey_client
+from valkey_changes import valkey_client
+from valkey_changes.changes import changes
 
 
 @asynccontextmanager
@@ -127,32 +128,22 @@ class EpisodeMediaTests(TransactionTestCase):
     async def test_download_completes_after_client_disconnect(self):
         req = self.factory.get(f"/e/{self.episode.pk}/media/")
 
-        done = asyncio.Event()
-        channel = podcast_publisher.channel_for(self.episode.pk)
-        subscriber = await valkey_client.create_subscriber(
-            channel, callback=lambda msg, ctx: ctx.set(), context=done
-        )
-        try:
-            async with running_downloader():
-                with patch(
-                    "podcasts.downloader.download_audio", make_mock_download(delay=0.3)
-                ):
-                    with override_settings(MEDIA_ROOT=str(self.media_root)):
-                        task = asyncio.create_task(episode_media(req, self.episode.pk))
-                        await asyncio.sleep(
-                            0.05
-                        )  # let it create the EpisodeDownload row and start waiting
-                        task.cancel()
-                        try:
-                            await task
-                        except asyncio.CancelledError:
-                            pass
+        episode_updates = podcast_publisher.subscribe(pk=self.episode.pk)
+        async with changes(episode_updates) as changed, running_downloader():
+            with patch("podcasts.downloader.download_audio", make_mock_download(delay=0.3)):
+                with override_settings(MEDIA_ROOT=str(self.media_root)):
+                    task = asyncio.create_task(episode_media(req, self.episode.pk))
+                    # Let it create the EpisodeDownload row and start waiting:
+                    await asyncio.sleep(0.05)
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
 
-                        # The download is owned by the downloader singleton, not the cancelled
-                        # request — wait for asave() to fire the pub/sub signal.
-                        await asyncio.wait_for(done.wait(), timeout=5)
-        finally:
-            await subscriber.close()
+                    # The download is owned by the downloader singleton, not the cancelled
+                    # request — wait for asave() to fire the pub/sub signal.
+                    await asyncio.wait_for(changed.wait(), timeout=5)
 
         await self.episode.arefresh_from_db()
         self.assertIsNotNone(self.episode.file_path)

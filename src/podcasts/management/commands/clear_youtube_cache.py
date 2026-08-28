@@ -2,7 +2,7 @@ import asyncio
 
 from django.core.management.base import BaseCommand
 
-from poddla import valkey_client
+from valkey_changes import valkey_client
 
 _CACHE_KEY_PATTERN = "youtube:*"
 

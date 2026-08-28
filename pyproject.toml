@@ -49,8 +49,8 @@ extend-select = ["W505"]
 max-doc-length = 100
 
 [tool.uv.build-backend]
-# Add all poddla django apps here:
-module-name = ["poddla", "podcasts"]
+# Add every top-level package under src/ here:
+module-name = ["poddla", "podcasts", "valkey_changes"]
 
 [dependency-groups]
 dev = [

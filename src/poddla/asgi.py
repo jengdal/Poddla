@@ -23,9 +23,12 @@ async def application(scope, receive, send):
             elif message["type"] == "lifespan.shutdown":
                 # Add any global cleanup calls here.
                 from podcasts import downloader
-                from poddla import valkey_client
+                from valkey_changes import changes, valkey_client
 
                 await downloader.stop()
+                # Before close_client(), so that the pump stops on purpose rather than by
+                # discovering its client has gone.
+                await changes.shutdown()
                 await valkey_client.close_client()
                 await send({"type": "lifespan.shutdown.complete"})
                 return

@@ -12,8 +12,8 @@ from django.http import HttpRequest, HttpResponse
 from django.template.loader import render_to_string
 
 from podcasts.models import PodcastFeed, podcast_publisher
-from poddla import valkey_client
-from poddla.state_store import StateStore
+from valkey_changes.changes import changes
+from valkey_changes.state_store import StateStore
 
 
 class PodcastsState(msgspec.Struct):
@@ -44,14 +44,12 @@ async def render_index(request: HttpRequest, state: PodcastsState):
 
 async def podcasts(request: HttpRequest):
     tab_id = secrets.token_urlsafe(16)
-    vk = await valkey_client.get_client()
-    state = await _store.get(vk, tab_id)
+    state = await _store.get(tab_id)
     return HttpResponse(await render_index(request=request, state=state))
 
 
 async def podcasts_sse(request: HttpRequest):
     signals = read_signals(request)
-    vk = await valkey_client.get_client()
     max_fps = 1
 
     async def generator():
@@ -61,37 +59,17 @@ async def podcasts_sse(request: HttpRequest):
             return
         tab_id = signals["tab_id"]
         event_id = 0
-        dirty = asyncio.Event()
 
-        def on_message(msg, ctx):
-            dirty.set()
-
-        # We use glide's callback mode because we only care about the latest message, and the
-        # polling mode keeps an unbounded list of all messages, which is not at all what we need:
-        # https://glide.valkey.io/how-to/publish-and-subscribe-messages/#receiving-messages
-        sub_state = await valkey_client.create_subscriber(
-            _store.channel(tab_id), callback=on_message
-        )
-        sub_model = await valkey_client.create_subscriber(
-            podcast_publisher.channel, callback=on_message
-        )
-
-        try:
+        tab = _store.subscribe(tab_id)
+        async with changes(tab, podcast_publisher.subscribe()) as changed:
             while True:
                 # Send the current state immediately, this primes the compression on the SSE stream:
-                state = await _store.get(vk, tab_id)
                 event_id += 1
-                html = await render_index(request=request, state=state)
-                yield ServerSentEventGenerator.patch_elements(
-                    html, event_id=str(event_id)
-                )
+                html = await render_index(request=request, state=tab.state)
+                yield ServerSentEventGenerator.patch_elements(html, event_id=str(event_id))
                 # Limit the FPS. When a lot of episodes are created we can get a lot of events at
                 # once and don't want to create a new "frame" for each one:
                 await asyncio.sleep(1.0 / max_fps)
-                await dirty.wait()
-                dirty.clear()
-        finally:
-            await sub_state.close()
-            await sub_model.close()
+                await changed.wait()
 
     return DatastarResponse(content=generator())

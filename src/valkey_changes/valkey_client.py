@@ -1,6 +1,6 @@
 import asyncio
-from collections.abc import AsyncGenerator, AsyncIterator, Callable
-from typing import Any, NamedTuple
+from collections.abc import AsyncGenerator, AsyncIterator
+from typing import NamedTuple
 
 from django.conf import settings
 from glide import GlideClient, GlideClientConfiguration, NodeAddress
@@ -64,35 +64,8 @@ async def _close_clients_of_gone_loops() -> None:
             await entry.owner.aclose()
 
 
-async def create_subscriber(
-    channel: str,
-    callback: Callable | None = None,
-    context: Any = None,
-) -> GlideClient:
-    nodes = [NodeAddress(settings.VALKEY_HOST, settings.VALKEY_PORT)]
-    if callback is not None:
-        config = GlideClientConfiguration(
-            nodes,
-            database_id=settings.VALKEY_DB,
-            pubsub_subscriptions=GlideClientConfiguration.PubSubSubscriptions(
-                channels_and_patterns={
-                    GlideClientConfiguration.PubSubChannelModes.Exact: {channel}
-                },
-                callback=callback,
-                context=context,
-            ),
-        )
-        return await GlideClient.create(config)
-    config = GlideClientConfiguration(nodes, database_id=settings.VALKEY_DB)
-    client = await GlideClient.create(config)
-    await client.subscribe({channel}, timeout_ms=5000)
-    return client
-
-
 async def close_client() -> None:
-    """Close the current event loops client, it's used from asgi.py.
-    The "_managed_client" trick doesn't work with asgi.
-    """
+    """Close the current event loops client, it's used from asgi.py."""
     current_loop = asyncio.get_running_loop()
     async with _lock:
         entry = _clients.get(current_loop)

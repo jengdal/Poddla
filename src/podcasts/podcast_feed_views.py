@@ -27,8 +27,8 @@ from podcasts.models import (
     download_publisher,
     podcast_publisher,
 )
-from poddla import valkey_client
-from poddla.state_store import StateStore
+from valkey_changes.changes import changes
+from valkey_changes.state_store import StateStore
 
 
 class PodcastFeedState(msgspec.Struct):
@@ -69,9 +69,8 @@ async def render_index(
 async def podcast_feed(request: HttpRequest, podcast_id: int):
     podcast = await aget_object_or_404(PodcastFeed.objects, pk=podcast_id)
     tab_id = secrets.token_urlsafe(16)
-    vk = await valkey_client.get_client()
     state = PodcastFeedState(tab_id=tab_id, podcast_id=podcast_id)
-    await _store.save(vk, tab_id, state)
+    await _store.save(tab_id, state)
     return HttpResponse(
         await render_index(request=request, state=state, podcast=podcast)
     )
@@ -81,8 +80,6 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
     if not await PodcastFeed.objects.filter(id=podcast_id).aexists():
         raise Http404
     signals = read_signals(request)
-
-    vk = await valkey_client.get_client()
     max_fps = 1
 
     async def generator():
@@ -92,26 +89,11 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
             return
         tab_id = signals["tab_id"]
         event_id = 0
-        dirty = asyncio.Event()
 
-        def on_message(msg, ctx):
-            dirty.set()
-
-        # We use glide's callback mode because we only care about the latest message, and the
-        # polling mode keeps an unbounded list of all messages, which is not at all what we need:
-        # https://glide.valkey.io/how-to/publish-and-subscribe-messages/#receiving-messages
-        sub_state = await valkey_client.create_subscriber(
-            _store.channel(tab_id), callback=on_message
-        )
-        sub_model = await valkey_client.create_subscriber(
-            podcast_publisher.channel, callback=on_message
-        )
-
-        try:
+        tab = _store.subscribe(tab_id)
+        async with changes(tab, podcast_publisher.subscribe()) as changed:
             while True:
                 # Send the current state immediately, this primes the compression on the SSE stream.
-                state = await _store.get(vk, tab_id)
-
                 try:
                     podcast = await PodcastFeed.objects.aget(pk=podcast_id)
                 except PodcastFeed.DoesNotExist:
@@ -120,18 +102,16 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
                     return
 
                 event_id += 1
-                html = await render_index(request=request, state=state, podcast=podcast)
+                html = await render_index(
+                    request=request, state=tab.state, podcast=podcast
+                )
                 yield ServerSentEventGenerator.patch_elements(
                     html, event_id=str(event_id)
                 )
                 # Limit the FPS. When a lot of episodes are created we can get a lot of events at
                 # once and don't want to create a new "frame" for each one:
                 await asyncio.sleep(1.0 / max_fps)
-                await dirty.wait()
-                dirty.clear()
-        finally:
-            await sub_state.close()
-            await sub_model.close()
+                await changed.wait()
 
     return DatastarResponse(content=generator())
 
@@ -160,18 +140,7 @@ async def episode_media(request: HttpRequest, episode_id: int):
             # tho.
             await download.asave(update_fields=["status"])
 
-        event = asyncio.Event()
-
-        def on_update(msg, ctx):
-            ctx.set()
-
-        download_sub = await valkey_client.create_subscriber(
-            download_publisher.channel_for(download.pk),
-            callback=on_update,
-            context=event,
-        )
-
-        try:
+        async with changes(download_publisher.subscribe(pk=download.pk)) as changed:
             while True:
                 episode = await Episode.objects.aget(id=episode_id)
                 episode_file = episode.file_exists()
@@ -191,13 +160,9 @@ async def episode_media(request: HttpRequest, episode_id: int):
                 # When the download status is PENDING or DOWNLOADING we continue the while loop.
 
                 try:
-                    await asyncio.wait_for(event.wait(), timeout=60 * 10)
+                    await asyncio.wait_for(changed.wait(), timeout=60 * 10)
                 except TimeoutError:
                     return HttpResponse(status=504)
-                event.clear()
-
-        finally:
-            await download_sub.close()
 
     # TODO: Use nginx or caddy to serve the file instead:
     return _serve_with_range(request, episode_file)

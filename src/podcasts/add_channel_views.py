@@ -16,8 +16,9 @@ from django.views.decorators.http import require_POST
 from podcasts.forms import FeedForm
 from podcasts.models import Episode, PodcastFeed
 from podcasts.youtube import FeedSource, fetch_feed
-from poddla import valkey_client
-from poddla.state_store import StateStore
+from valkey_changes import valkey_client
+from valkey_changes.changes import changes
+from valkey_changes.state_store import StateStore
 
 
 class AddChannelState(msgspec.Struct):
@@ -101,8 +102,7 @@ async def render_index(request: HttpRequest, state: AddChannelState):
 
 async def add_channel(request: HttpRequest):
     tab_id = secrets.token_urlsafe(16)
-    vk = await valkey_client.get_client()
-    state = await _store.get(vk, tab_id)
+    state = await _store.get(tab_id)
     return HttpResponse(await render_index(request=request, state=state))
 
 
@@ -113,28 +113,19 @@ async def add_channel_sse(request: HttpRequest):
         raise Exception()
     tab_id = signals["tab_id"]
 
-    vk = await valkey_client.get_client()
-
     async def generator():
         event_id = 0
-        sub = await valkey_client.create_subscriber(_store.channel(tab_id))
-        try:
-            # Send current state immediately on connect.
-            state = await _store.get(vk, tab_id)
-            event_id += 1
-            html = await render_index(request=request, state=state)
-            yield ServerSentEventGenerator.patch_elements(html, event_id=str(event_id))
-
+        tab = _store.subscribe(tab_id)
+        # changes() reads the state as it starts, so the first pass through the loop is the
+        # "send current state immediately on connect" one.
+        async with changes(tab) as changed:
             while True:
-                await sub.get_pubsub_message()
-                state = await _store.get(vk, tab_id)
                 event_id += 1
-                html = await render_index(request=request, state=state)
+                html = await render_index(request=request, state=tab.state)
                 yield ServerSentEventGenerator.patch_elements(
                     html, event_id=str(event_id)
                 )
-        finally:
-            await sub.close()
+                await changed.wait()
 
     return DatastarResponse(content=generator())
 
@@ -152,7 +143,7 @@ async def set_state(request: HttpRequest):
     preview = "preview" in request.GET
 
     vk = await valkey_client.get_client()
-    state = await _store.get(vk, tab_id)
+    state = await _store.get(tab_id)
     if request.POST.get("url", None):
         state.data = dict(request.POST.items())
     else:
@@ -180,5 +171,5 @@ async def set_state(request: HttpRequest):
         state.can_preview = False
         state.podcast_id = None
 
-    await _store.save(vk, tab_id, state)
+    await _store.save(tab_id, state)
     return HttpResponse(status=204)
