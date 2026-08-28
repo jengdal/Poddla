@@ -47,11 +47,10 @@ async def stop() -> None:
 
 
 async def _reset_stale_downloading() -> None:
-    """
-    Clear old downloads that might be left over after a crash.
+    """Clear old downloads that might be left over after a crash.
 
-    You should NOT run multiple instances of the downloader as this code will cause problems
-    with multiple downloaders.
+    You should NOT run multiple instances of the downloader as this code will cause problems with
+    multiple downloaders.
     """
     # Just delete them. Clients can retry them if they need them.
     await EpisodeDownload.objects.filter(status=EpisodeDownload.STATUS_DOWNLOADING).adelete()
@@ -98,8 +97,7 @@ async def _process_download(ed: EpisodeDownload) -> None:
 
 
 async def downloader() -> None:
-    """
-    This is the downloader loop.
+    """This is the downloader loop.
 
     Listen for EpisodeDownload changes and download up to MAX_CONCURRENT_DOWNLOADS.
     """
