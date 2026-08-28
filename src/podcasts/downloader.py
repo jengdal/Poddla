@@ -16,12 +16,22 @@ MAX_CHANGE_WAIT = 120
 _task: asyncio.Task | None = None
 
 
+def _log_unexpected_exit(task: asyncio.Task) -> None:
+    """The downloader task is never awaited while it runs, so nothing else would report this."""
+    if task.cancelled():
+        return
+    error = task.exception()
+    if error is not None:
+        logger.error("The downloader stopped and downloads will not run.", exc_info=error)
+
+
 def start() -> None:
     """Start the singleton downloader loop if it isn't already running."""
     global _task
     if _task is not None and not _task.done():
         return
     _task = asyncio.create_task(downloader())
+    _task.add_done_callback(_log_unexpected_exit)
 
 
 async def stop() -> None:
@@ -30,10 +40,9 @@ async def stop() -> None:
     if _task is None:
         return
     _task.cancel()
-    try:
-        await _task
-    except asyncio.CancelledError:
-        pass
+    # return_exceptions so that a downloader which already failed doesn't take the shutdown down
+    # with it. Whatever went wrong was reported by _log_unexpected_exit when it happened.
+    await asyncio.gather(_task, return_exceptions=True)
     _task = None
 
 
