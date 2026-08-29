@@ -1,140 +1,138 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 from django.conf import settings
 
-from podcasts.models import EpisodeDownload, download_publisher
+from podcasts.asyncio_utils import wait_lock_or_func
+from podcasts.models import (
+    Episode,
+    PodcastFeed,
+    episode_publisher,
+)
+from podcasts.youtube import fetch_feed
 from podcasts.youtube.video import download_audio
+from valkey_changes import valkey_client
 from valkey_changes.changes import changes
 
 logger = logging.getLogger(__name__)
 
-MAX_CONCURRENT_DOWNLOADS = settings.MAX_CONCURRENT_DOWNLOADS
-MAX_CHANGE_WAIT = 120
+# We throttle YT requests, we only allow:
+# - A single download _from YT_ at a time
+# - A single channel/playlist metadata download _from YT_ at a time.
+#
+# NOTE: however that users of Poddla can still download/stream multiple
+# concurrent audio files and podcast feeds. It is only the requests to YT that
+# are throttled. I think this limitation is perfectly fine for a self-hosted
+# service meant for personal use. I think it's sensible to not send too many
+# concurrent requests to YT for obvious reasons. The locking mechanism relies
+# on there only being a single Poddla worker process, which is the case if you
+# follow the deploy instructions. I may refactor this in the future to make it
+# possible to allow more than one download at a time, but that will probably
+# require a task queue.
+_audio_download_lock = asyncio.Lock()
+_feed_download_lock = asyncio.Lock()
 
-_task: asyncio.Task | None = None
 
-
-def _log_unexpected_exit(task: asyncio.Task) -> None:
-    """The downloader task is never awaited while it runs, so nothing else would report this."""
+def _refresh_podcast_feed_cleanup(task: asyncio.Task[None]) -> None:
     if task.cancelled():
         return
     error = task.exception()
     if error is not None:
-        logger.error("The downloader stopped and downloads will not run.", exc_info=error)
+        logger.error("The podcast feed update task failed.", exc_info=error)
 
 
-def start() -> None:
-    """Start the singleton downloader loop if it isn't already running."""
-    global _task
-    if _task is not None and not _task.done():
-        return
-    _task = asyncio.create_task(downloader())
-    _task.add_done_callback(_log_unexpected_exit)
+async def refresh_podcast_feed_task(
+    podcast: PodcastFeed, update_task: asyncio.Task[None] | None
+) -> asyncio.Task[None]:
+    if not update_task or update_task.done():
+        update_task = asyncio.create_task(refresh_podcast_feed(podcast=podcast))
+        update_task.add_done_callback(_refresh_podcast_feed_cleanup)
+    return update_task
 
 
-async def stop() -> None:
-    """Cancel the downloader and wait for any downloads to complete."""
-    global _task
-    if _task is None:
-        return
-    _task.cancel()
-    # return_exceptions so that a downloader which already failed doesn't take the shutdown down
-    # with it. Whatever went wrong was reported by _log_unexpected_exit when it happened.
-    await asyncio.gather(_task, return_exceptions=True)
-    _task = None
+async def refresh_podcast_feed(podcast: PodcastFeed) -> None:
+    async with _feed_download_lock:
+        podcast = await PodcastFeed.objects.aget(pk=podcast.pk)
+        if not podcast.needs_updating():
+            return
+        await _refresh_podcast_feed(podcast=podcast)
 
 
-async def _reset_stale_downloading() -> None:
-    """Clear old downloads that might be left over after a crash.
-
-    You should NOT run multiple instances of the downloader as this code will cause problems with
-    multiple downloaders.
-    """
-    # Just delete them. Clients can retry them if they need them.
-    await EpisodeDownload.objects.filter(status=EpisodeDownload.STATUS_DOWNLOADING).adelete()
-
-
-async def _claim_next_batch(limit: int, exclude_ids: list[int]) -> list[EpisodeDownload]:
-    claimed = []
-    qs = (
-        EpisodeDownload.objects.filter(status=EpisodeDownload.STATUS_PENDING)
-        .exclude(id__in=exclude_ids)
-        .select_related("episode")
-        .order_by("index", "created_at")[:limit]
+async def _refresh_podcast_feed(podcast: PodcastFeed) -> None:
+    feed = await fetch_feed(
+        url=str(podcast.url),
+        cache_valkey_client=await valkey_client.get_client(),
+        cache_seconds=settings.YOUTUBE_META_CACHE_SECONDS,
     )
-    async for ed in qs:
-        ed.status = EpisodeDownload.STATUS_DOWNLOADING
-        await ed.asave(update_fields=["status"])
-        claimed.append(ed)
-    return claimed
+
+    podcast.name = feed.title
+    podcast.description = feed.description or ""
+    podcast.thumbnail = feed.thumbnail or ""
+    await podcast.asave(update_fields=["name", "description", "thumbnail", "updated_at"])
+
+    for v in feed.videos:
+        published_at = datetime.fromtimestamp(v.timestamp, tz=timezone.utc) if v.timestamp else None
+        await Episode.objects.aupdate_or_create(
+            podcast=podcast,
+            url=v.url,
+            defaults={"title": v.title},
+            create_defaults={
+                "title": v.title,
+                "youtube_id": v.id,
+                # These are not very accurate when gotten from the channel or playlist. When we
+                # download media, we also get more accurate data for these and update them at
+                # that point, so don't overwrite potentially better data here:
+                "duration": v.duration,
+                "thumbnail": v.thumbnail or "",
+                "published_at": published_at,
+            },
+        )
 
 
-async def _process_download(ed: EpisodeDownload) -> None:
-    episode = ed.episode
+async def download_episode_media(episode: Episode) -> Episode:
+    episode_file = episode.file_exists()
+    if episode_file:
+        return episode
+    async with changes(episode_publisher.subscribe(pk=episode.id)) as changed:
+        while not episode_file:
+            outcome, _ = await wait_lock_or_func(_audio_download_lock, changed.wait())
+            handed_off = False
+            try:
+                episode = await Episode.objects.aget(id=episode.id)
+                episode_file = episode.file_exists()
+                if not episode_file and outcome == "lock":
+                    # If we get cancelled the lock would immediately be released by the
+                    # `finally` below, but the yt-dlp download would still continue until
+                    # it finished. This means the lock mechanism would basically be broken,
+                    # we could have multiple concurrent downloads just because clients
+                    # disconnected. We take care of that by letting the task release when
+                    # it's done:
+                    handed_off = True
+                    return await asyncio.shield(asyncio.create_task(_download_and_release(episode)))
+            finally:
+                if outcome == "lock" and not handed_off:
+                    _audio_download_lock.release()
+
+    return episode
+
+
+async def _download_and_release(episode: Episode) -> Episode:
+    try:
+        return await _download_and_update(episode)
+    finally:
+        _audio_download_lock.release()
+
+
+async def _download_and_update(episode: Episode) -> Episode:
     media_root = Path(settings.MEDIA_ROOT)
     rel_path = Path(str(episode.podcast_id)) / str(episode.id)
-    try:
-        download_info = await asyncio.to_thread(download_audio, episode.url, media_root, rel_path)
-        episode.file_path = str(download_info.file_path.relative_to(media_root))
-        episode.published_at = download_info.published_at
-        episode.duration = download_info.duration
-        episode.show_notes = str(download_info.description or "")
-        # episode_publisher will notify listeners on save:
-        await episode.asave(update_fields=("published_at", "duration", "show_notes", "file_path"))
-    except asyncio.CancelledError:
-        # Shutting down while the download is still incomplete. The EpisodeDownload will be
-        # deleted on next start, the client may retry if it wishes to have the file.
-        raise
-    except Exception:
-        logger.exception("Download failed for episode %s (EpisodeDownload %s)", episode.id, ed.id)
-        ed.status = EpisodeDownload.STATUS_FAILED
-        await ed.asave(update_fields=["status"])
-    else:
-        # Job's done — Episode.file_path is now the source of truth.
-        await ed.adelete()
-
-
-async def downloader() -> None:
-    """This is the downloader loop.
-
-    Listen for EpisodeDownload changes and download up to MAX_CONCURRENT_DOWNLOADS.
-    """
-    await _reset_stale_downloading()
-
-    in_flight: dict[int, asyncio.Task] = {}
-
-    # The loop below does a pass before it ever waits, so the first check happens immediately.
-    async with changes(download_publisher.subscribe()) as changed:
-        try:
-            while True:
-                for ed_id, task in list(in_flight.items()):
-                    if task.done():
-                        del in_flight[ed_id]
-
-                free_slots = MAX_CONCURRENT_DOWNLOADS - len(in_flight)
-                if free_slots > 0:
-                    claimed = await _claim_next_batch(
-                        limit=free_slots, exclude_ids=list(in_flight.keys())
-                    )
-                    for ed in claimed:
-                        logger.debug(
-                            "Starting download task for episode %s (EpisodeDownload %s)",
-                            ed.episode_id,
-                            ed.id,
-                        )
-                        in_flight[ed.id] = asyncio.create_task(_process_download(ed))
-
-                try:
-                    # We don't wait indefinitely. Make sure to check the tasks and the db
-                    # periodically even if we received no notification.
-                    await asyncio.wait_for(changed.wait(), timeout=MAX_CHANGE_WAIT)
-                except TimeoutError:
-                    logger.debug("Rechecking EpisodeDownloads.")
-        except asyncio.CancelledError:
-            for task in in_flight.values():
-                task.cancel()
-            if in_flight:
-                await asyncio.gather(*in_flight.values(), return_exceptions=True)
-            raise
+    download_info = await asyncio.to_thread(download_audio, episode.url, media_root, rel_path)
+    episode.file_path = str(download_info.file_path.relative_to(media_root))
+    episode.published_at = download_info.published_at
+    episode.duration = download_info.duration
+    episode.show_notes = str(download_info.description or "")
+    # podcast_publisher will notify listeners on save:
+    await episode.asave(update_fields=("published_at", "duration", "show_notes", "file_path"))
+    return episode

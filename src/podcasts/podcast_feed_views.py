@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import mimetypes
 import secrets
 from pathlib import Path
@@ -20,11 +21,10 @@ from django.http import (
 from django.shortcuts import aget_object_or_404
 from django.template.loader import render_to_string
 
+from podcasts.downloader import download_episode_media, refresh_podcast_feed_task
 from podcasts.models import (
     Episode,
-    EpisodeDownload,
     PodcastFeed,
-    download_publisher,
     podcast_publisher,
 )
 from valkey_changes.changes import changes
@@ -36,6 +36,8 @@ class PodcastFeedState(msgspec.Struct):
     podcast_id: int = 0
 
 
+logger = logging.getLogger(__name__)
+
 _store: StateStore[PodcastFeedState] = StateStore(
     PodcastFeedState,
     namespace="podcast_feed",
@@ -43,9 +45,7 @@ _store: StateStore[PodcastFeedState] = StateStore(
 )
 
 
-def sync_render_index(
-    request: HttpRequest, state: PodcastFeedState, podcast: PodcastFeed
-):
+def sync_render_index(request: HttpRequest, state: PodcastFeedState, podcast: PodcastFeed):
     episodes = list(podcast.episodes.order_by("-published_at"))
     return render_to_string(
         request=request,
@@ -58,12 +58,8 @@ def sync_render_index(
     )
 
 
-async def render_index(
-    request: HttpRequest, state: PodcastFeedState, podcast: PodcastFeed
-):
-    return await sync_to_async(sync_render_index)(
-        request=request, state=state, podcast=podcast
-    )
+async def render_index(request: HttpRequest, state: PodcastFeedState, podcast: PodcastFeed):
+    return await sync_to_async(sync_render_index)(request=request, state=state, podcast=podcast)
 
 
 async def podcast_feed(request: HttpRequest, podcast_id: int):
@@ -71,9 +67,7 @@ async def podcast_feed(request: HttpRequest, podcast_id: int):
     tab_id = secrets.token_urlsafe(16)
     state = PodcastFeedState(tab_id=tab_id, podcast_id=podcast_id)
     await _store.save(tab_id, state)
-    return HttpResponse(
-        await render_index(request=request, state=state, podcast=podcast)
-    )
+    return HttpResponse(await render_index(request=request, state=state, podcast=podcast))
 
 
 async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
@@ -83,35 +77,52 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
     max_fps = 1
 
     async def generator():
-        if not signals:
-            # Reload because this doesn't make sense.
-            yield ServerSentEventGenerator.redirect("./")
-            return
-        tab_id = signals["tab_id"]
-        event_id = 0
+        try:
+            if not signals:
+                # Reload because this doesn't make sense.
+                yield ServerSentEventGenerator.redirect("./")
+                return
+            tab_id = signals["tab_id"]
+            event_id = 0
+            update_task: asyncio.Task[None] | None = None
+            tab = _store.subscribe(tab_id)
+            async with changes(tab, podcast_publisher.subscribe()) as changed:
+                while True:
+                    # Send the current state immediately, this primes the compression on the SSE stream.
+                    try:
+                        podcast = await PodcastFeed.objects.aget(pk=podcast_id)
+                    except PodcastFeed.DoesNotExist:
+                        # The podcast has been deleted, we reload the page so that the user gets a 404:
+                        yield ServerSentEventGenerator.redirect("./")
+                        return
 
-        tab = _store.subscribe(tab_id)
-        async with changes(tab, podcast_publisher.subscribe()) as changed:
-            while True:
-                # Send the current state immediately, this primes the compression on the SSE stream.
-                try:
-                    podcast = await PodcastFeed.objects.aget(pk=podcast_id)
-                except PodcastFeed.DoesNotExist:
-                    # The podcast has been deleted, we reload the page so that the user gets a 404:
-                    yield ServerSentEventGenerator.redirect("./")
-                    return
+                    if podcast.needs_updating():
+                        # This starts a background task unless update_task is still running.
+                        # The only purpose of update_task is to make sure this particular SSE connection
+                        # doesn't start multiple concurrent tasks. There's also a process wide lock that ensures
+                        # only one feed is updated at a time, so there's no risk the feed is
+                        # updated multiple times concurrently.
+                        update_task = await refresh_podcast_feed_task(
+                            podcast=podcast, update_task=update_task
+                        )
+                        # If the task finds new episodes we'll be notified about it through `podcast_publisher`.
 
-                event_id += 1
-                html = await render_index(
-                    request=request, state=tab.state, podcast=podcast
-                )
-                yield ServerSentEventGenerator.patch_elements(
-                    html, event_id=str(event_id)
-                )
-                # Limit the FPS. When a lot of episodes are created we can get a lot of events at
-                # once and don't want to create a new "frame" for each one:
-                await asyncio.sleep(1.0 / max_fps)
-                await changed.wait()
+                    event_id += 1
+                    html = await render_index(request=request, state=tab.state, podcast=podcast)
+                    yield ServerSentEventGenerator.patch_elements(html, event_id=str(event_id))
+                    # Limit the FPS. When a lot of episodes are created we can get a lot of events at
+                    # once and don't want to create a new "frame" for each one:
+                    await asyncio.sleep(1.0 / max_fps)
+                    try:
+                        # The timeout ensures we render at least one frame every 30 seconds.
+                        await asyncio.wait_for(changed.wait(), timeout=30)
+                    except asyncio.TimeoutError:
+                        pass
+
+                    # await changed.wait()
+        except Exception:
+            logger.exception("Error in the podcast feed sse view.")
+            raise
 
     return DatastarResponse(content=generator())
 
@@ -120,49 +131,18 @@ async def episode_media(request: HttpRequest, episode_id: int):
     """This view serve episode audio.
 
     - If the file already exists on our filesystem, it is served directly.
-    - Else we tell the downloader it needs to download the file by creating
-      or updating a EpisodeDownload row, and wait util the file has been
-      downloaded.
-    - Multiple simultaneous clients requesting the same file will wait for the
-      same download.
-    - If a client disconnects, the downloader will still complete the download.
+    - If we need to download the file we use a process wide lock to ensure we only download a single file at a time.
     """
     episode = await aget_object_or_404(Episode, pk=episode_id)
     episode_file = episode.file_exists()
     if not episode_file:
-        download, created = await EpisodeDownload.objects.aget_or_create(
-            episode_id=episode_id
-        )
-        if not created and download.status == EpisodeDownload.STATUS_FAILED:
-            download.status = EpisodeDownload.STATUS_PENDING
-            # TODO: There's a race-condition here, another client might have changed it to pending
-            # already, and the downloader could even have finished it theoretically, very unlikely
-            # tho.
-            await download.asave(update_fields=["status"])
+        # `download_episode_media` makes sure the file is only downloaded once.
+        episode = await download_episode_media(episode=episode)
+        episode_file = episode.file_exists()
 
-        async with changes(download_publisher.subscribe(pk=download.pk)) as changed:
-            while True:
-                episode = await Episode.objects.aget(id=episode_id)
-                episode_file = episode.file_exists()
-                if episode_file:
-                    break
-                try:
-                    download = await EpisodeDownload.objects.aget(episode_id=episode_id)
-                except EpisodeDownload.DoesNotExist:
-                    # This could happen if the episode finished after we checked the episode file
-                    # but before we checked the download. The download row is deleted when the
-                    # download finishes. So, recheck immediately:
-                    continue
-                if download.status == EpisodeDownload.STATUS_FAILED:
-                    # We don't auto retry the download while waiting, the client will have to retry
-                    # the request.
-                    return HttpResponse(status=500)
-                # When the download status is PENDING or DOWNLOADING we continue the while loop.
-
-                try:
-                    await asyncio.wait_for(changed.wait(), timeout=60 * 10)
-                except TimeoutError:
-                    return HttpResponse(status=504)
+    if not episode_file:
+        logger.error("The Episode (%s) file was not downloaded.", episode.id)
+        return HttpResponse(status=500)
 
     # TODO: Use nginx or caddy to serve the file instead:
     return _serve_with_range(request, episode_file)
@@ -196,9 +176,7 @@ def _serve_with_range(request: HttpRequest, filepath: Path) -> HttpResponse:
                 remaining -= len(chunk)
                 yield chunk
 
-    response = StreamingHttpResponse(
-        read_range(), status=206, content_type=content_type
-    )
+    response = StreamingHttpResponse(read_range(), status=206, content_type=content_type)
     response["Content-Range"] = f"bytes {start}-{end}/{file_size}"
     response["Content-Length"] = str(length)
     response["Accept-Ranges"] = "bytes"

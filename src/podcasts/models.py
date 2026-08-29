@@ -1,12 +1,15 @@
+from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from valkey_changes.model_publisher import ModelPublisher
 
 podcast_publisher = ModelPublisher("podcasts:feed:updates")
-download_publisher = ModelPublisher("download:updates")
+episode_publisher = ModelPublisher("episodes:feed:updates")
+PODCAST_FEED_OLD_MINUTES = 5
 
 
 class PublicPodcastManager(models.Manager):
@@ -35,6 +38,7 @@ class PodcastFeed(models.Model):
     url = models.URLField()
     name = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     description = models.TextField(blank=True)
     thumbnail = models.URLField(blank=True)
     # channel_id = models.CharField(max_length=255, blank=True)
@@ -42,6 +46,9 @@ class PodcastFeed(models.Model):
     objects = PublicPodcastManager()
     drafts = DraftPodcastManager()
     everything = models.Manager()
+
+    def needs_updating(self) -> bool:
+        return self.updated_at + timedelta(minutes=PODCAST_FEED_OLD_MINUTES) <= timezone.now()
 
     class Meta:
         constraints = [
@@ -78,39 +85,12 @@ class Episode(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["podcast", "youtube_id"],
+                fields=["podcast", "url"],
                 name="unique_episode_per_podcast",
             )
         ]
 
 
-class EpisodeDownload(models.Model):
-    STATUS_PENDING = "pending"
-    STATUS_DOWNLOADING = "downloading"
-    STATUS_FAILED = "failed"
-    # - When a download is queued and waiting to be downloaded, its status is PENDING.
-    # - When it's downloading the status is DOWNLOADING.
-    # - When it's failed the download it's FAILED.
-    # - When it's succeeded the row is deleted. The Episode itself will contain the
-    #   file path to the audio file.
-    STATUS_CHOICES = [
-        (STATUS_PENDING, "Pending"),
-        (STATUS_DOWNLOADING, "Downloading"),
-        (STATUS_FAILED, "Failed"),
-    ]
-
-    episode = models.ForeignKey(Episode, on_delete=models.CASCADE, related_name="downloads")
-    index = models.IntegerField(default=0)
-    created_at = models.DateTimeField(null=False, auto_now_add=True)
-    status = models.CharField(max_length=18, choices=STATUS_CHOICES, default=STATUS_PENDING)
-
-    class Meta:
-        ordering = ["index", "created_at"]
-        constraints = [
-            models.UniqueConstraint(fields=["episode"], name="unique_download_per_episode")
-        ]
-
-
-download_publisher.register(EpisodeDownload)
 podcast_publisher.register(PodcastFeed)
 podcast_publisher.register(Episode)
+episode_publisher.register(Episode)
