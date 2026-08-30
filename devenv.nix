@@ -141,6 +141,10 @@ in
       publish_arch amd64 poddla-image-amd64
       publish_arch arm64 poddla-image-arm64
 
+      # Remove any items from previous runs.
+      # TODO: Could we be doing these things better?
+      docker manifest rm "$REGISTRY_IMAGE:$TAG" 2>/dev/null || true
+
       docker manifest create "$REGISTRY_IMAGE:$TAG" \
         --amend "$REGISTRY_IMAGE:$TAG-amd64" \
         --amend "$REGISTRY_IMAGE:$TAG-arm64"
