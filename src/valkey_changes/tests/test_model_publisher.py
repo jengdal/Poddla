@@ -8,7 +8,7 @@ from glide import ClosingError
 
 from valkey_changes import valkey_client
 from valkey_changes.changes import Changes, Source, changes
-from valkey_changes.tests.models import Thing, publisher
+from valkey_changes.tests.models import Part, Thing, publisher
 
 TIMEOUT = 5
 
@@ -122,3 +122,55 @@ class ModelPublisherTests(TransactionTestCase):
         # dead event loop:
         with self.assertRaises(ClosingError):
             await asyncio.wait_for(_created_clients[0].ping(), timeout=2)
+
+
+@override_settings(VALKEY_DB=15)
+class ResolvePkTests(TransactionTestCase):
+    """Part is registered with resolve_pk=lambda instance: instance.thing_id, so its changes
+    should publish on its parent Thing's pk, never on its own.
+    """
+
+    def setUp(self):
+        # A throwaway row so Thing's and Part's autoincrement pks can't coincidentally collide,
+        # which would make test_child_save_does_not_publish_on_its_own_pk_channel pass by accident.
+        Thing.objects.create(name="Padding")
+        self.thing = Thing.objects.create(name="Test thing")
+        self.part = Part.objects.create(thing=self.thing)
+        async_to_sync(_flush_valkey)()
+
+    def tearDown(self):
+        async_to_sync(_flush_valkey)()
+
+    async def test_child_save_publishes_on_the_type_and_parent_pk_channels(self):
+        type_updates = publisher.subscribe()
+        parent_updates = publisher.subscribe(pk=self.thing.pk)
+        async with changes(type_updates, parent_updates) as changed:
+            await self.part.asave()
+
+            await _wait_for_all(changed, type_updates, parent_updates)
+
+    async def test_child_delete_publishes_on_the_parent_pk_channel(self):
+        parent_updates = publisher.subscribe(pk=self.thing.pk)
+        async with changes(parent_updates) as changed:
+            await self.part.adelete()
+
+            await _wait_for_all(changed, parent_updates)
+
+    async def test_child_save_does_not_publish_on_its_own_pk_channel(self):
+        # resolve_pk's result replaces instance.pk entirely, it isn't published in addition to it.
+        own_updates = publisher.subscribe(pk=self.part.pk)
+        async with changes(own_updates) as changed:
+            await self.part.asave()
+
+            with self.assertRaises(TimeoutError):
+                await asyncio.wait_for(changed.wait(), timeout=0.5)
+
+    async def test_child_delete_in_a_transaction_still_resolves_the_parent_pk(self):
+        # Mirrors test_delete_in_a_transaction_publishes_on_the_instance_channel: resolve_pk has
+        # to run from the signal handler itself, before the transaction commits, or a delete
+        # inside atomic() would have nothing left to resolve a pk from.
+        parent_updates = publisher.subscribe(pk=self.thing.pk)
+        async with changes(parent_updates) as changed:
+            await sync_to_async(_delete_in_transaction)(self.part)
+
+            await _wait_for_all(changed, parent_updates)

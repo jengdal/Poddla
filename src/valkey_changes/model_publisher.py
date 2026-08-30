@@ -1,6 +1,12 @@
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
 from glide import Batch
 
 from valkey_changes import changes, valkey_client
+
+if TYPE_CHECKING:
+    from django.db.models import Model
 
 
 class ModelPublisher:
@@ -33,9 +39,28 @@ class ModelPublisher:
         batch.publish(b"1", self.channel_for(pk))
         await vk.exec(batch, raise_on_error=True)
 
-    # TODO: let the caller pass in a function that resolves the pk of the "main" model. This lets child model changes publish on their parents pk.
-    def register(self, *model_classes) -> None:
-        """Connect post_save and post_delete signals for each model class.
+    def register(self, model_class, resolve_pk: Callable[["Model"], object] | None = None) -> None:
+        """Connect post_save and post_delete signals for a model class.
+
+        If your ModelPublisher instance is meant for a model Author, but you
+        also want the related model Book to trigger a change on its author when
+        it changes, you can set that up with:
+
+        ```python
+        class Author(models.Model):
+            pass
+        class Book(models.Model):
+            author = models.ForeignKey(Author, related_name="books")
+
+        author_publisher = ModelPublisher('author')
+        author_publisher.register(Author)
+        author_publisher.register(Book, resolve_pk=lambda instance: instance.author_id)
+        ```
+
+        In this setup, when a Book instance is saved or deleted
+        author_publisher will notify subscribers that
+        1. A author has changed.
+        2. The author with pk `book.author_id` has changed.
 
         NOTE: QuerySet.update() bypasses Django signals and will NOT trigger
         pub/sub. For bulk updates, call publisher.publish() explicitly.
@@ -48,12 +73,12 @@ class ModelPublisher:
             if raw:
                 # Loaddata etc.
                 return
-            # Django clears instance.pk on deletes, after the transaction commits. Keep track
-            # of it here:
-            pk = instance.pk
+            if resolve_pk:
+                pk = resolve_pk(instance)
+            else:
+                pk = instance.pk
             transaction.on_commit(lambda: async_to_sync(self.publish)(pk=pk), robust=True)
 
         uid = f"model_publisher:{self._channel_name}"
-        for model in model_classes:
-            post_save.connect(handler, sender=model, weak=False, dispatch_uid=uid)
-            post_delete.connect(handler, sender=model, weak=False, dispatch_uid=uid)
+        post_save.connect(handler, sender=model_class, weak=False, dispatch_uid=uid)
+        post_delete.connect(handler, sender=model_class, weak=False, dispatch_uid=uid)

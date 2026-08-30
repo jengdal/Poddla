@@ -92,5 +92,5 @@ class Episode(models.Model):
 
 
 podcast_publisher.register(PodcastFeed)
-podcast_publisher.register(Episode)
+podcast_publisher.register(Episode, resolve_pk=lambda instance: instance.podcast_id)
 episode_publisher.register(Episode)
