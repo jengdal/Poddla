@@ -125,11 +125,14 @@ in
       REGISTRY_IMAGE="''${DOCKER_REGISTRY_IMAGE:?DOCKER_REGISTRY_IMAGE is not set (see .env.example)}"
       TAG="''${1:-latest}"
 
+      # Built the two architectures in one go. The slow uv2nix parsing can then be shared between them.
+      echo "Building amd64 and arm64 images..."
+      build_paths=$(devenv build outputs.poddla-image-amd64 outputs.poddla-image-arm64)
+
       publish_arch() {
         local arch="$1" output="$2"
-        echo "Building $arch image..."
         local store_path
-        store_path=$(devenv build "outputs.$output" | jq -r ".\"outputs.$output\"")
+        store_path=$(jq -r ".\"outputs.$output\"" <<< "$build_paths")
         docker load < "$store_path"
         docker tag poddla:latest "$REGISTRY_IMAGE:$TAG-$arch"
         docker push "$REGISTRY_IMAGE:$TAG-$arch"

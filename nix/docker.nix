@@ -9,6 +9,12 @@
 }:
 
 let
+  # We don't use `languages.python.import` so that we can run this on mac.
+  # Use uv2nix to build a venv based on our pyproject.toml and uv.lock.
+  # This just parses uv.lock and pyproject.toml, it can be shared across the two architectures:
+  pythonWorkspace = inputs.uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ../.; };
+  pythonOverlay = pythonWorkspace.mkPyprojectOverlay { sourcePreference = "wheel"; };
+
   # Build our image for the given linux architecture:
   # To use this you need a builder set up that support the architecture(s). I use rosetta-builder
   # on my mac but you could build each image on a computer of the same architecture.
@@ -19,10 +25,6 @@ let
 
       bgutil-server-linux = pkgsLinux.callPackage ./bgutil-server.nix { };
 
-      # Use uv2nix to build a venv based on our pyproject.toml and uv.lock.
-      # We don't use `languages.python.import` so that we can run this on mac.
-      pythonWorkspace = inputs.uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ../.; };
-      pythonOverlay = pythonWorkspace.mkPyprojectOverlay { sourcePreference = "wheel"; };
       pythonSet =
         (pkgsLinux.callPackage inputs.pyproject-nix.build.packages {
           python = pkgsLinux.${pythonPackageName};
