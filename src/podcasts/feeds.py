@@ -1,9 +1,16 @@
+import logging
+
+from asgiref.sync import async_to_sync
 from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.feedgenerator import Rss201rev2Feed
 
+from podcasts.downloader import refresh_podcast_feed
+
 from .models import PodcastFeed
+
+logger = logging.getLogger(__name__)
 
 
 def _format_duration(seconds):
@@ -56,7 +63,19 @@ class PodcastFeedRss(Feed):
 
     def get_object(self, request, podcast_id):
         self.request = request
-        return get_object_or_404(PodcastFeed.objects, pk=podcast_id)
+        podcast = get_object_or_404(PodcastFeed.objects, pk=podcast_id)
+        if podcast.needs_updating():
+            logger.debug("Going to update the PodcastFeed (%s)", podcast.id)
+            try:
+                async_to_sync(refresh_podcast_feed)(podcast=podcast)
+            except Exception:
+                # Just log the fail and serve what we already have.
+                logger.exception(
+                    "Failed to update the PodcastFeed (%s) from the source. Serving what we have.",
+                    podcast.id,
+                )
+            podcast.refresh_from_db()
+        return podcast
 
     def title(self, obj):
         return obj.name
@@ -83,9 +102,7 @@ class PodcastFeedRss(Feed):
         return item.url
 
     def item_enclosure_url(self, item):
-        return self.request.build_absolute_uri(
-            reverse("podcast_episode_media", args=[item.pk])
-        )
+        return self.request.build_absolute_uri(reverse("podcast_episode_media", args=[item.pk]))
 
     def item_enclosure_length(self, item):
         return 0
