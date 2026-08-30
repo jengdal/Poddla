@@ -33,6 +33,7 @@ class ModelPublisher:
         batch.publish(b"1", self.channel_for(pk))
         await vk.exec(batch, raise_on_error=True)
 
+    # TODO: let the caller pass in a function that resolves the pk of the "main" model. This lets child model changes publish on their parents pk.
     def register(self, *model_classes) -> None:
         """Connect post_save and post_delete signals for each model class.
 
