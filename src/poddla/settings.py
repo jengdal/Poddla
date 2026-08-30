@@ -27,6 +27,7 @@ env = environ.Env(
     MEDIA_ROOT=(str, None),
     STATIC_ROOT=(str, str(BASE_DIR / "staticfiles")),
     BGUTIL_SERVER_HOME=(str, ""),
+    LOG_LEVEL=(str, "DEBUG"),
 )
 environ.Env.read_env(BASE_DIR.parent / ".env")
 
@@ -43,6 +44,7 @@ YOUTUBE_AUDIO_CACHE_SECONDS = env("YOUTUBE_AUDIO_CACHE_SECONDS")
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(env("MEDIA_ROOT"))
 BGUTIL_SERVER_HOME = env("BGUTIL_SERVER_HOME")
+LOG_LEVEL = env("LOG_LEVEL")
 
 # Application definition
 
@@ -166,5 +168,29 @@ STATIC_ROOT = Path(env("STATIC_ROOT"))
 MAILERS = {
     "default": {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
+    },
+}
+
+# Logging
+# https://docs.djangoproject.com/en/6.1/topics/logging/
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "simple": {
+            "format": "{levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": LOG_LEVEL,
     },
 }
