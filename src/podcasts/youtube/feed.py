@@ -42,27 +42,6 @@ def _extract_info(url: str) -> dict:
         return ydl.extract_info(url, download=False) or {}
 
 
-async def _extract_info_cached(
-    url: str, vk: GlideClient | None, cache_seconds: int
-) -> dict:
-    if vk is None:
-        return await asyncio.to_thread(_extract_info, url)
-    cache_key = f"{YOUTUBE_CACHE_KEY_PREFIX}{url}"
-    cached = await vk.get(cache_key)
-    if cached is not None:
-        try:
-            return msgspec.msgpack.decode(cached)
-        except Exception:
-            pass
-    info = await asyncio.to_thread(_extract_info, url)
-    await vk.set(
-        cache_key,
-        msgspec.msgpack.encode(info),
-        expiry=ExpirySet(ExpiryType.SEC, cache_seconds),
-    )
-    return info
-
-
 def _get_thumbnail(thumbnails: list[dict] | None) -> str | None:
     if not thumbnails:
         return None
