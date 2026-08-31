@@ -24,6 +24,9 @@ def _format_duration(seconds):
     return f"{m}:{s:02d}"
 
 
+DEFAULT_ITUNES_CATEGORY = "Society & Culture"
+
+
 class PodcastRssFeed(Rss201rev2Feed):
     def rss_attributes(self):
         attrs = super().rss_attributes()
@@ -32,19 +35,30 @@ class PodcastRssFeed(Rss201rev2Feed):
                 "xmlns:itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd",
                 "xmlns:dc": "http://purl.org/dc/elements/1.1/",
                 "xmlns:content": "http://purl.org/rss/1.0/modules/content/",
-                "xmlns:atom": "http://www.w3.org/2005/Atom/",
             }
         )
         return attrs
 
     def add_root_elements(self, handler):
+        # Override the default `atom:link`.
+        feed_url = self.feed.get("feed_url")
+        self.feed["feed_url"] = None
         super().add_root_elements(handler)
+        self.feed["feed_url"] = feed_url
+
+        if feed_url:
+            handler.addQuickElement(
+                "atom:link",
+                None,
+                {"rel": "self", "href": feed_url, "type": "application/rss+xml"},
+            )
         if image := self.feed.get("itunes_image"):
             handler.startElement("itunes:image", {"href": image})
             handler.endElement("itunes:image")
         if author := self.feed.get("itunes_author"):
             handler.addQuickElement("itunes:author", author)
-        handler.addQuickElement("itunes:explicit", "no")
+        handler.addQuickElement("itunes:explicit", "false")
+        handler.addQuickElement("itunes:category", None, {"text": DEFAULT_ITUNES_CATEGORY})
 
     def add_item_elements(self, handler, item):
         super().add_item_elements(handler, item)
@@ -52,7 +66,9 @@ class PodcastRssFeed(Rss201rev2Feed):
             handler.addQuickElement("itunes:duration", duration)
         if summary := item.get("itunes_summary"):
             handler.addQuickElement("itunes:summary", summary)
-            handler._write(f"<content:encoded><![CDATA[{summary}]]></content:encoded>")
+            # Escape
+            safe_summary = summary.replace("]]>", "]]]]><![CDATA[>")
+            handler._write(f"<content:encoded><![CDATA[{safe_summary}]]></content:encoded>")
         if image := item.get("itunes_image"):
             handler.startElement("itunes:image", {"href": image})
             handler.endElement("itunes:image")
@@ -105,6 +121,8 @@ class PodcastFeedRss(Feed):
         return self.request.build_absolute_uri(reverse("podcast_episode_media", args=[item.pk]))
 
     def item_enclosure_length(self, item):
+        if episode_file := item.file_exists():
+            return episode_file.stat().st_size
         return 0
 
     def item_enclosure_mime_type(self, item):
