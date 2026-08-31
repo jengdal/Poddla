@@ -8,7 +8,7 @@
       {% for podcast in podcast_feeds %}
         <a href="{% url 'podcast_feed' podcast.id %}" class="ui-card">
           {% if podcast.thumbnail %}
-            <img class="podcast-card-thumbnail" src="{{ podcast.thumbnail }}" alt="{{ podcast.name }}" />
+            <img class="podcast-card-thumbnail" src="{{ podcast.thumbnail }}" alt="{{ podcast.name }}" referrerpolicy="no-referrer" />
           {% else %}
             <div class="podcast-card-thumbnail-placeholder"></div>
           {% endif %}

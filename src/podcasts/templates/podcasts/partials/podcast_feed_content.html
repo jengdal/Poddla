@@ -3,7 +3,7 @@
 
   <div class="podcast-feed-header">
     {% if podcast.thumbnail %}
-      <img src="{{ podcast.thumbnail }}" alt="{{ podcast.name }}" class="podcast-feed-thumbnail" />
+      <img src="{{ podcast.thumbnail }}" alt="{{ podcast.name }}" class="podcast-feed-thumbnail" referrerpolicy="no-referrer" />
     {% else %}
       <div class="podcast-feed-thumbnail-placeholder"></div>
     {% endif %}
@@ -26,7 +26,7 @@
       {% for episode in episodes %}
       <li class="ui-item">
         {% if episode.thumbnail %}
-          <img src="{{ episode.thumbnail }}" alt="{{ episode.title }}"
+          <img src="{{ episode.thumbnail }}" alt="{{ episode.title }}" referrerpolicy="no-referrer"
                style="width:80px;height:48px;object-fit:cover;border-radius:var(--radius-1);flex-shrink:0">
         {% endif %}
         <div class="ui-content">
