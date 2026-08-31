@@ -1,4 +1,15 @@
-{$SITE_ADDRESS}:8080 {
+{
+	servers {
+		# If this Caddy is behind a HTTPS proxy, it needs to be trusted.
+		# If TRUSTED_PROXIES is unset we use an impossible CIDR, trusting no proxy.
+		trusted_proxies static {$TRUSTED_PROXIES:0.0.0.0/32}
+	}
+}
+
+# Tips Specify protocol and port in SITE_ADDRESS:
+# - http://poddla.example.com:8080 if you only want http on port 8080.
+# - https://poddla.example.com for https.
+{$SITE_ADDRESS} {
 	handle_path /static/* {
 		root * /srv/static
 		file_server

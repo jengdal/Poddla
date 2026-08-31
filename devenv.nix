@@ -39,6 +39,7 @@ in
     pkgs.nixfmt
     pkgs.valkey
     pkgs.jq
+    pkgs.caddy
 
     # For yt-dlp:
     pkgs.deno
