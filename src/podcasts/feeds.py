@@ -1,12 +1,15 @@
 import logging
 
 from asgiref.sync import async_to_sync
+from django.contrib.auth.decorators import login_not_required
 from django.contrib.syndication.views import Feed
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.feedgenerator import Rss201rev2Feed
 
 from podcasts.downloader import refresh_podcast_feed
+from user_settings.authenticated_urls import build_authenticated_url
+from user_settings.basic_auth import authenticate_basic_auth, basic_auth_challenge
 
 from .models import PodcastFeed
 
@@ -74,8 +77,24 @@ class PodcastRssFeed(Rss201rev2Feed):
             handler.endElement("itunes:image")
 
 
+@login_not_required
 class PodcastFeedRss(Feed):
+    """Serves the RSS feed.
+
+    HTTP Basic auth so that podcast apps can auth using the users basic auth
+    password (UserSettings), different than the normal auth password. We don't
+    want to serve this freely on the internet and doubt any podcast apps can do
+    a web app login flow.
+    """
+
     feed_type = PodcastRssFeed
+
+    def __call__(self, request, *args, **kwargs):
+        user = authenticate_basic_auth(request)
+        if user is None:
+            return basic_auth_challenge()
+        self.auth_user = user
+        return super().__call__(request, *args, **kwargs)
 
     def get_object(self, request, podcast_id):
         self.request = request
@@ -118,7 +137,13 @@ class PodcastFeedRss(Feed):
         return item.url
 
     def item_enclosure_url(self, item):
-        return self.request.build_absolute_uri(reverse("podcast_episode_media", args=[item.pk]))
+        return build_authenticated_url(
+            request=self.request,
+            username=self.auth_user.username,
+            basic_auth_password=self.auth_user.user_settings.basic_auth_password,
+            view_name="podcast_episode_media",
+            args=(item.pk,),
+        )
 
     def item_enclosure_length(self, item):
         if episode_file := item.file_exists():

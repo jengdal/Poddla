@@ -50,7 +50,7 @@ max-doc-length = 100
 
 [tool.uv.build-backend]
 # Add every top-level package under src/ here:
-module-name = ["poddla", "podcasts", "valkey_changes"]
+module-name = ["poddla", "podcasts", "valkey_changes", "user_settings"]
 
 [dependency-groups]
 dev = [

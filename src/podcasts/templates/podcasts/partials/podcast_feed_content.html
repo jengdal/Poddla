@@ -1,4 +1,5 @@
 {% load podcast_filters %}
+{% load user_settings_tags %}
 <div class="podcast-feed-layout">
 
   <div class="podcast-feed-header">
@@ -17,7 +18,7 @@
           <span class="ui-caption">{{ count }} episode{{ count|pluralize }}</span>
         {% endif %}
       {% endwith %}
-      <a href="{% url 'podcast_feed_rss' state.podcast_id %}" class="ui-button ui-outlined">RSS Feed</a>
+      <a href="{% authed_feed_url 'podcast_feed_rss' state.podcast_id %}" class="ui-button ui-outlined">RSS Feed</a>
     </div>
   </div>
 

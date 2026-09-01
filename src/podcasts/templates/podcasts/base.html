@@ -22,7 +22,13 @@
       <div class="app-header-inner">
         <a href="{% url 'podcasts' %}" class="app-brand">Poddla</a>
         <nav>
+          {% if user.is_authenticated %}
           <a href="{% url 'add_channel' %}" class="ui-button ui-outlined">Add Channel</a>
+          <form method="post" action="{% url 'logout' %}" style="display:inline">
+            {% csrf_token %}
+            <button class="ui-button ui-outlined" type="submit">Log out</button>
+          </form>
+          {% endif %}
         </nav>
       </div>
     </header>

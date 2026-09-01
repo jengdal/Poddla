@@ -16,6 +16,9 @@ services:
       DEBUG: "False"
       DATABASE_URL: sqlite:////data/db/poddla.sqlite3
       MEDIA_ROOT: /data/media
+      # CHANGE before deploying: sets the password for an automatically created 'admin' user.
+      # Only used the first time - has no effect once an 'admin' user exists.
+      INITIAL_ADMIN_PASSWORD: "changeme-generate-a-real-password"
     volumes:
       # Metadata about the podcasts will be stored in a sqlite file located here:
       - ./data/db:/data/db

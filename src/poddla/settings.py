@@ -30,6 +30,7 @@ env = environ.Env(
     STATIC_ROOT=(str, str(BASE_DIR / "staticfiles")),
     BGUTIL_SERVER_HOME=(str, ""),
     LOG_LEVEL=(str, "DEBUG"),
+    INITIAL_ADMIN_PASSWORD=(str, ""),
 )
 environ.Env.read_env(BASE_DIR.parent / ".env")
 
@@ -44,7 +45,7 @@ if USE_HTTPS:
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True
 
-SECURE_REFERRER_POLICY = "no-referrer"
+SECURE_REFERRER_POLICY = "same-origin"
 
 
 VALKEY_PORT = env("VALKEY_PORT")
@@ -56,6 +57,9 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(str(env("MEDIA_ROOT")))
 BGUTIL_SERVER_HOME = env("BGUTIL_SERVER_HOME")
 LOG_LEVEL = env("LOG_LEVEL")
+# Used to create the initial 'admin' user:
+# user_settings/management/commands/create_initial_admin.py.
+INITIAL_ADMIN_PASSWORD = env("INITIAL_ADMIN_PASSWORD")
 
 # Application definition
 
@@ -68,6 +72,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "podcasts",
     "valkey_changes",
+    "user_settings",
 ]
 
 if DEBUG:
@@ -81,6 +86,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.auth.middleware.LoginRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -116,6 +122,16 @@ TEST_RUNNER = "poddla.runner.Runner"
 DATABASES = {
     "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
 }
+
+
+# Auth
+# https://docs.djangoproject.com/en/6.1/topics/auth/default/
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "podcasts"
+LOGOUT_REDIRECT_URL = "login"
+
+AUTHENTICATION_BACKENDS = ["poddla.backends.UserSettingsModelBackend"]
 
 
 # Password validation

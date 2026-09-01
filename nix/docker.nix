@@ -59,6 +59,7 @@ let
       poddlaProdEntrypoint = pkgsLinux.writeShellScriptBin "poddla-prod-entrypoint" ''
         set -euo pipefail
         "${app}/bin/django-admin" migrate --noinput
+        "${app}/bin/django-admin" create_initial_admin
         exec "${app}/bin/uvicorn" --port 8000 --host 0.0.0.0 \
                 --timeout-graceful-shutdown 0 \
                 poddla.asgi:application

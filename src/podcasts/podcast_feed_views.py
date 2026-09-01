@@ -11,6 +11,7 @@ from datastar_py.django import (
     DatastarResponse,
     read_signals,
 )
+from django.contrib.auth.decorators import login_not_required
 from django.http import (
     FileResponse,
     Http404,
@@ -27,6 +28,7 @@ from podcasts.models import (
     PodcastFeed,
     podcast_publisher,
 )
+from user_settings.basic_auth import authenticate_basic_auth, basic_auth_challenge
 from valkey_changes.changes import changes
 from valkey_changes.state_store import StateStore
 
@@ -127,12 +129,20 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
     return DatastarResponse(content=generator())
 
 
+@login_not_required
 async def episode_media(request: HttpRequest, episode_id: int):
     """This view serve episode audio.
 
+    - We can't require the normal auth flow here as I doubt any podcast apps
+      would support that, instead we use basic auth, the users username and a
+      special basic auth password (UserSettings).
     - If the file already exists on our filesystem, it is served directly.
-    - If we need to download the file we use a process wide lock to ensure we only download a single file at a time.
+    - If we need to download the file we use a process wide lock to ensure we
+      only download a single file at a time.
     """
+    if await sync_to_async(authenticate_basic_auth)(request) is None:
+        return basic_auth_challenge()
+
     episode = await aget_object_or_404(Episode, pk=episode_id)
     episode_file = episode.file_exists()
     if not episode_file:

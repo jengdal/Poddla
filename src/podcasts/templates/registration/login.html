@@ -1,0 +1,34 @@
+{% extends "podcasts/base.html" %}
+{% block content %}
+<div class="login-container">
+  <h1 class="ui-h4">Log in</h1>
+
+  <form method="post" class="ui-form">
+    {% csrf_token %}
+
+    <div class="ui-text-field" {% if form.username.errors %}data-invalid{% endif %}>
+      <label for="{{ form.username.id_for_label }}">Username</label>
+      <div class="ui-field">{{ form.username }}</div>
+    </div>
+
+    <div class="ui-text-field" {% if form.password.errors %}data-invalid{% endif %}>
+      <label for="{{ form.password.id_for_label }}">Password</label>
+      <div class="ui-field">{{ form.password }}</div>
+    </div>
+
+    {% if form.non_field_errors %}
+      <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
+        {% for error in form.non_field_errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <input type="hidden" name="next" value="{{ next }}">
+
+    <div class="ui-actions">
+      <button class="ui-button ui-filled" type="submit">Log in</button>
+    </div>
+  </form>
+</div>
+{% endblock content %}

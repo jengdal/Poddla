@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import tempfile
 import threading
 import time
@@ -6,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
+from django.contrib.auth.models import User
 from django.test import AsyncRequestFactory, TransactionTestCase, override_settings
 
 from podcasts.downloader import _audio_download_lock
@@ -14,6 +16,11 @@ from podcasts.podcast_feed_views import episode_media
 from podcasts.youtube.video import DownloadInfo
 from valkey_changes import valkey_client
 from valkey_changes.changes import changes
+
+
+def _basic_auth_headers(username: str, password: str) -> dict:
+    token = base64.b64encode(f"{username}:{password}".encode()).decode()
+    return {"Authorization": f"Basic {token}"}
 
 
 def make_download(
@@ -72,6 +79,11 @@ class EpisodeMediaTests(TransactionTestCase):
             url="https://youtube.com/watch?v=abc123",
             show_notes="",
         )
+        self.user = User.objects.create_user(username="listener", password="not-the-basic-auth-one")
+        self.user_settings = self.user.user_settings
+        self.user_settings.basic_auth_password = "test-password"
+        self.user_settings.save()
+        self.auth_headers = _basic_auth_headers("listener", "test-password")
         self.factory = AsyncRequestFactory()
         async_to_sync(_flush_valkey)()
 
@@ -82,8 +94,16 @@ class EpisodeMediaTests(TransactionTestCase):
         if _audio_download_lock.locked():
             _audio_download_lock.release()
 
-    async def test_single_request_downloads_and_serves(self):
+    async def test_requires_basic_auth(self):
         req = self.factory.get(f"/e/{self.episode.pk}/media/")
+
+        response = await episode_media(req, self.episode.pk)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertTrue(response["WWW-Authenticate"].startswith("Basic"))
+
+    async def test_single_request_downloads_and_serves(self):
+        req = self.factory.get(f"/e/{self.episode.pk}/media/", headers=self.auth_headers)
         with (
             patch("podcasts.downloader.download_audio", make_download()),
             override_settings(MEDIA_ROOT=str(self.media_root)),
@@ -101,7 +121,7 @@ class EpisodeMediaTests(TransactionTestCase):
         self.episode.file_path = str(path.relative_to(self.media_root))
         await self.episode.asave(update_fields=["file_path"])
 
-        req = self.factory.get(f"/e/{self.episode.pk}/media/")
+        req = self.factory.get(f"/e/{self.episode.pk}/media/", headers=self.auth_headers)
         counter: dict = {"n": 0}
         with (
             patch("podcasts.downloader.download_audio", make_download(call_counter=counter)),
@@ -113,7 +133,7 @@ class EpisodeMediaTests(TransactionTestCase):
         self.assertIn(response.status_code, (200, 206))
 
     async def test_concurrent_requests_download_once(self):
-        req = self.factory.get(f"/e/{self.episode.pk}/media/")
+        req = self.factory.get(f"/e/{self.episode.pk}/media/", headers=self.auth_headers)
         counter: dict = {"n": 0}
         with (
             patch(
@@ -138,7 +158,7 @@ class EpisodeMediaTests(TransactionTestCase):
     async def test_failed_download_releases_the_lock_for_the_next_request(self):
         # Regression test: a download that raises used to leak _audio_download_lock forever,
         # wedging every later request for any episode.
-        req = self.factory.get(f"/e/{self.episode.pk}/media/")
+        req = self.factory.get(f"/e/{self.episode.pk}/media/", headers=self.auth_headers)
         with (
             patch(
                 "podcasts.downloader.download_audio",
@@ -164,7 +184,7 @@ class EpisodeMediaTests(TransactionTestCase):
         # the underlying thread on cancellation, so without shielding, the DB update that
         # records the finished download never happens - and the *next* request starts a
         # brand new download, unaware a copy is still running unseen in the background.
-        req = self.factory.get(f"/e/{self.episode.pk}/media/")
+        req = self.factory.get(f"/e/{self.episode.pk}/media/", headers=self.auth_headers)
         counter: dict = {"n": 0}
         started = threading.Event()
         episode_updates = episode_publisher.subscribe(pk=self.episode.pk)
