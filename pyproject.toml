@@ -30,7 +30,7 @@ exclude = ["**/node_modules", "**/__pycache__"]
 executionEnvironments = [{ root = "src" }]
 
 [tool.bandit]
-exclude_dirs = [".venv"]
+exclude_dirs = [".venv", "tests"]
 
 [tool.docformatter]
 recursive = true

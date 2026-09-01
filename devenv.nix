@@ -97,7 +97,7 @@ in
 
   scripts.run_bandit = {
     exec = ''
-      uv run bandit -r src/
+      uv run bandit -c pyproject.toml -r src/
     '';
   };
 
