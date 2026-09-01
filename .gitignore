@@ -12,6 +12,10 @@ devenv.local.yaml
 
 *.pyc
 
+# Coverage
+.coverage
+htmlcov
+
 # Environment
 .env
 

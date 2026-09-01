@@ -109,6 +109,16 @@ in
     '';
   };
 
+  # Create a HTML coverage report based on the `.coverage` file produced by the previous
+  # `devenv test` run:
+  scripts.coverage_html = {
+    exec = ''
+      uv run coverage html
+      echo "Coverage report: htmlcov/index.html"
+      open htmlcov/index.html
+    '';
+  };
+
   # Build both arch images (see `docker.nix`) and publish them to the registry as one
   # multi-arch tag. Usage: `devenv shell docker-publish [tag]` (defaults to `latest`).
   # Reads DOCKER_REGISTRY_IMAGE from .env (see .env.example). Assumes you've already
@@ -155,14 +165,18 @@ in
 
   # Run with `devenv test`.
   # devenv will start the needed processes.
+  # Note that coverage is configured in pyproject.toml.
   enterTest = ''
+    set -euo pipefail
+
     if [ -f .env ]; then
       set -a
       source .env
       set +a
     fi
     wait_for_port "$VALKEY_PORT"
-    manage test -v 2
+    uv run coverage run src/manage.py test -v 2
+    uv run coverage report -m
   '';
 
   processes.web = {

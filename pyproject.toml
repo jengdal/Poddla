@@ -52,9 +52,25 @@ max-doc-length = 100
 # Add every top-level package under src/ here:
 module-name = ["poddla", "podcasts", "valkey_changes", "user_settings"]
 
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = [
+  "*/migrations/*",
+  "*/tests/*",
+  "src/manage.py",
+  "src/poddla/asgi.py",
+  "src/poddla/wsgi.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 70
+
 [dependency-groups]
 dev = [
   "bandit>=1.9.4",
+  "coverage>=7.16.0",
   "django-browser-reload>=1.21.0",
   "django-debug-toolbar>=7.1.1",
   "django-extensions>=4.1",
