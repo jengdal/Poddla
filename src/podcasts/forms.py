@@ -22,7 +22,7 @@ class FeedForm(forms.Form):
         validators=[validate_youtube_url, validate_unique],
         widget=forms.URLInput(
             attrs={
-                # This gets rid of the client side validation. An invalid form won't get @post'ed.
+                # type=text gets rid of the client side validation. An invalid form won't get @post'ed.
                 "type": "text",
                 "class": "ui-text-input",
                 "placeholder": "https://www.youtube.com/channel/...",
