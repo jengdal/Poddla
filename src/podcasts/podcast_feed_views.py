@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import mimetypes
-import secrets
 from pathlib import Path
 
 import msgspec
@@ -66,9 +65,9 @@ async def render_index(request: HttpRequest, state: PodcastFeedState, podcast: P
 
 async def podcast_feed(request: HttpRequest, podcast_id: int):
     podcast = await aget_object_or_404(PodcastFeed.objects, pk=podcast_id)
-    tab_id = secrets.token_urlsafe(16)
-    state = PodcastFeedState(tab_id=tab_id, podcast_id=podcast_id)
-    await _store.save(tab_id, state)
+    state = await _store.new(request.user.id)
+    state.podcast_id = podcast_id
+    await _store.save(state.tab_id, state, request.user.id)
     return HttpResponse(await render_index(request=request, state=state, podcast=podcast))
 
 
@@ -87,7 +86,7 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
             tab_id = signals["tab_id"]
             event_id = 0
             update_task: asyncio.Task[None] | None = None
-            tab = _store.subscribe(tab_id)
+            tab = _store.subscribe(tab_id, request.user.id)
             async with changes(tab, podcast_publisher.subscribe()) as changed:
                 while True:
                     # Send the current state immediately, this primes the compression on the SSE stream.

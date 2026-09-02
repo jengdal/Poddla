@@ -1,5 +1,4 @@
 import asyncio
-import secrets
 
 import msgspec
 from asgiref.sync import sync_to_async
@@ -43,8 +42,7 @@ async def render_index(request: HttpRequest, state: PodcastsState):
 
 
 async def podcasts(request: HttpRequest):
-    tab_id = secrets.token_urlsafe(16)
-    state = await _store.get(tab_id)
+    state = await _store.new(request.user.id)
     return HttpResponse(await render_index(request=request, state=state))
 
 
@@ -60,7 +58,7 @@ async def podcasts_sse(request: HttpRequest):
         tab_id = signals["tab_id"]
         event_id = 0
 
-        tab = _store.subscribe(tab_id)
+        tab = _store.subscribe(tab_id, request.user.id)
         async with changes(tab, podcast_publisher.subscribe()) as changed:
             while True:
                 # Send the current state immediately, this primes the compression on the SSE stream:

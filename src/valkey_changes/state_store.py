@@ -1,8 +1,10 @@
 import asyncio
+import secrets
 from collections.abc import Callable
 from typing import Generic, TypeVar
 
 import msgspec
+from django.core.exceptions import PermissionDenied
 from glide import Batch, ExpirySet, ExpiryType
 
 from valkey_changes import changes, valkey_client
@@ -30,15 +32,41 @@ class StateStore(Generic[T]):
     def _decode(self, data: bytes) -> T:
         return msgspec.msgpack.decode(data, type=self._type)
 
-    async def get(self, tab_id: str) -> T:
+    def _check_owner(self, tab_id: str, user_id: int | None) -> None:
+        """Ensure the state belongs to the user_id"""
+        owner, _, _ = tab_id.partition(":")
+        if owner != str(user_id or 0):
+            raise PermissionDenied("This tab does not belong to the current user.")
+
+    async def new(self, user_id: int | None) -> T:
+        """Create a new state for the given `user_id`.
+
+        In order to support anonymous users, `user_id` can be None. Note the
+        lessened privacy in that case, tho the secret part of `tab_id` should
+        be very unguessable anyway, so this is not a big deal.
+        """
+        secret_part = secrets.token_urlsafe(16)
+        tab_id = f"{user_id or 0}:{secret_part}"
+        state = self._default_factory(tab_id)
+        await self.save(tab_id, state, user_id)
+        return state
+
+    async def _get(self, tab_id: str) -> T:
         vk = await valkey_client.get_client()
         data = await vk.get(self._key(tab_id))
         if data is None:
             return self._default_factory(tab_id)
         return self._decode(data)
 
-    async def save(self, tab_id: str, state: T, expire_seconds: int = 60 * 60 * 24) -> None:
+    async def get(self, tab_id: str, user_id: int | None) -> T:
+        self._check_owner(tab_id, user_id)
+        return await self._get(tab_id)
+
+    async def save(
+        self, tab_id: str, state: T, user_id: int | None, expire_seconds: int = 60 * 60 * 24
+    ) -> None:
         """Atomically save and publish the value."""
+        self._check_owner(tab_id, user_id)
         packed = msgspec.msgpack.encode(state)
         batch = Batch(is_atomic=True)
         batch.set(
@@ -50,7 +78,8 @@ class StateStore(Generic[T]):
         vk = await valkey_client.get_client()
         await vk.exec(batch, raise_on_error=True)
 
-    def subscribe(self, tab_id: str) -> StateSource[T]:
+    def subscribe(self, tab_id: str, user_id: int | None) -> StateSource[T]:
+        self._check_owner(tab_id, user_id)
         return StateSource(self, tab_id)
 
 
@@ -77,7 +106,7 @@ class StateSource(changes.Source, Generic[T]):
 
     async def _start(self, event: asyncio.Event) -> None:
         await super()._start(event)
-        self._state = await self._store.get(self._tab_id)
+        self._state = await self._store._get(self._tab_id)
 
     async def _consume(self) -> bool:
         fired, payload = self._take()
@@ -85,7 +114,7 @@ class StateSource(changes.Source, Generic[T]):
             return False
         if payload is None:
             # A wake with nothing attached, so we don't know what we missed. Read it back.
-            self._state = await self._store.get(self._tab_id)
+            self._state = await self._store._get(self._tab_id)
         else:
             self._state = self._store._decode(payload)
         return True

@@ -1,4 +1,3 @@
-import secrets
 from datetime import datetime, timezone
 
 import msgspec
@@ -101,8 +100,7 @@ async def render_index(request: HttpRequest, state: AddChannelState):
 
 
 async def add_channel(request: HttpRequest):
-    tab_id = secrets.token_urlsafe(16)
-    state = await _store.get(tab_id)
+    state = await _store.new(request.user.id)
     return HttpResponse(await render_index(request=request, state=state))
 
 
@@ -115,7 +113,7 @@ async def add_channel_sse(request: HttpRequest):
 
     async def generator():
         event_id = 0
-        tab = _store.subscribe(tab_id)
+        tab = _store.subscribe(tab_id, request.user.id)
         # changes() reads the state as it starts, so the first pass through the loop is the
         # "send current state immediately on connect" one.
         async with changes(tab) as changed:
@@ -142,7 +140,7 @@ async def set_state(request: HttpRequest):
     preview = "preview" in request.GET
 
     vk = await valkey_client.get_client()
-    state = await _store.get(tab_id)
+    state = await _store.get(tab_id, request.user.id)
     if request.POST.get("url", None):
         state.data = dict(request.POST.items())
     else:
@@ -168,7 +166,7 @@ async def set_state(request: HttpRequest):
                 )
             elif preview:
                 state.loading = True
-                await _store.save(tab_id, state)
+                await _store.save(tab_id, state, request.user.id)
                 feed = await fetch_feed(
                     url=form.cleaned_data["url"],
                     cache_valkey_client=vk,
@@ -183,6 +181,6 @@ async def set_state(request: HttpRequest):
             state.podcast_id = None
     finally:
         state.loading = False
-        await _store.save(tab_id, state)
+        await _store.save(tab_id, state, request.user.id)
 
     return HttpResponse(status=204)

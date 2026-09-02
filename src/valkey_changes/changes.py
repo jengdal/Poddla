@@ -241,7 +241,7 @@ async def changes(*sources: Source) -> AsyncIterator[Changes]:
 
     One event covers all of them, so a caller waits once no matter how many sources there are:
 
-        tab = _store.subscribe(tab_id)
+        tab = _store.subscribe(tab_id, user_id)
         async with changes(tab, podcast_publisher.subscribe()) as changed:
             while True:
                 ...render(tab.state)...
