@@ -1,0 +1,70 @@
+<form
+  id="feed-update-settings-form"
+  class="ui-form"
+  method="post"
+  data-class:loading="$feed_update.loading"
+  {# Using the form submit we get submit by return key #}
+  data-on:submit="$feed_update.loading=true; $feed_update.save=true; {{ post_call }}"
+  data-on:keyup__debounce.200ms__capture="{{ post_call }}"
+  data-on:change__capture="{{ post_call }}"
+>
+
+  <fieldset class="settings-field-group">
+    <legend>Feed updates</legend>
+
+      {% if state.show_form %}
+    <div class="ui-text-field" {% if form.hours.errors %}data-invalid{% endif %}>
+      <label for="{{ form.hours.id_for_label }}">Hours</label>
+      <div class="ui-field">
+          <input id="{{ form.hours.id_for_label }}" type="number" data-bind="feed_update.data.hours" min="0"/>
+      </div>
+      {% if form.hours.errors %}
+        <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
+          {% for error in form.hours.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <div class="ui-text-field" {% if form.minutes.errors %}data-invalid{% endif %}>
+      <label for="{{ form.minutes.id_for_label }}">Minutes</label>
+      <div class="ui-field">
+          <input id="{{ form.minutes.id_for_label }}" type="number" data-bind="feed_update.data.minutes" min="0"/>
+      </div>
+      {% if form.minutes.errors %}
+        <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
+          {% for error in form.minutes.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <div class="ui-actions">
+      <button
+        class="ui-button ui-filled"
+        type="submit"
+        data-attr:aria-busy="$feed_update.loading && 'true'"
+        {% if not state.can_save %}disabled{% endif %}>
+        Save
+      </button>
+        {# By dispatching `change` we trigger the already existing data-on:change above, and hence only ever have a single post request in flight. #}
+        <button class="ui-button ui-outlined" type="button" data-on:click="$feed_update.show_form=false; el.dispatchEvent(new Event('change', { bubbles: true }));">
+        Cancel
+      </button>
+    </div>
+
+      {% else %}
+    <p class="settings-current-value">
+        Feeds are checked for new episodes at most every
+        {% if current.hours %}
+          {{ current.hours }}h
+        {%endif%}{%if current.minutes %}
+          {{ current.minutes }}m{%endif%}.
+    </p>
+      <button class="ui-button ui-outlined" type="button" data-on:click="$feed_update.show_form=true; el.dispatchEvent(new Event('change', { bubbles: true }));">Edit</button>
+      {% endif %}
+  </fieldset>
+
+</form>

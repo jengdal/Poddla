@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     "podcasts",
     "valkey_changes",
     "user_settings",
+    "poddla_settings",
 ]
 
 if DEBUG:

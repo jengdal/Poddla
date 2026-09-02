@@ -1,3 +1,7 @@
+@view-transition {
+  navigation: auto;
+}
+
 /* === Theme: YouTube Red === */
 @layer theme {
   :where(html) {
@@ -197,4 +201,82 @@ a.ui-card:hover {
   to {
     transform: rotate(1turn);
   }
+}
+
+/* === Settings layout === */
+.settings-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-7);
+}
+
+.settings-form-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-5);
+  border-radius: var(--border-radius);
+  padding: var(--size-6);
+
+  background-color: var(--surface-default);
+  box-shadow: var(--shadow-4);
+}
+
+.settings-form-panel .ui-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-5);
+}
+
+.settings-field-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--size-4);
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.settings-field-group legend {
+  inline-size: 100%;
+  padding: 0;
+  margin-block-end: var(--size-2);
+  font-weight: 600;
+}
+
+.settings-field-group .ui-text-field {
+  flex: 1;
+  min-inline-size: 12rem;
+}
+
+.settings-field-group .settings-current-value {
+  inline-size: 100%;
+  margin: 0;
+}
+
+.settings-field-group .ui-actions {
+  inline-size: 100%;
+}
+
+/* Block interaction and show a spinner overlay on a form while it's saving */
+.settings-form-panel .ui-form.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.settings-form-panel .ui-form.loading > * {
+  opacity: 0.5;
+}
+
+.settings-form-panel .ui-form.loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 3px solid var(--surface-3);
+  border-block-start-color: var(--text-1);
+  border-radius: 50%;
+  animation: add-channel-spin 0.7s linear infinite;
 }

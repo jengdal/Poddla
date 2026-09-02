@@ -1,0 +1,88 @@
+<form
+  id="media-files-settings-form"
+  class="ui-form"
+  method="post"
+  data-class:loading="$media_files.loading"
+  data-on:submit="$media_files.loading=true; $media_files.save=true; {{ post_call }}"
+  data-on:keyup__debounce.200ms__capture="{{ post_call }}"
+  data-on:change__capture="{{ post_call }}"
+>
+  <fieldset class="settings-field-group">
+    <legend>Media file expiration</legend>
+
+      {% if state.show_form %}
+    <label class="ui-checkbox">
+      <input type="checkbox" data-bind="media_files.enabled" />
+      <span class="ui-label">Automatically delete old media files</span>
+    </label>
+
+
+    {% if state.enabled %}
+    <div class="ui-text-field" {% if form.weeks.errors %}data-invalid{% endif %}>
+      <label for="{{ form.weeks.id_for_label }}">Weeks</label>
+      <div class="ui-field">
+          <input
+            id="{{ form.weeks.id_for_label }}"
+            type="number"
+            min="0"
+            data-bind="media_files.data.weeks"
+            data-attr:disabled="!$media_files.enabled"/>
+      </div>
+      {% if form.weeks.errors %}
+        <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
+          {% for error in form.weeks.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <div class="ui-text-field" {% if form.days.errors %}data-invalid{% endif %}>
+      <label for="{{ form.days.id_for_label }}">Days</label>
+      <div class="ui-field">
+          <input
+            id="{{ form.days.id_for_label }}"
+            type="number"
+            min="0"
+            data-bind="media_files.data.days"
+            data-attr:disabled="!$media_files.enabled"/>
+      </div>
+      {% if form.days.errors %}
+        <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
+          {% for error in form.days.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="ui-actions">
+      <button
+        class="ui-button ui-filled"
+        type="submit"
+        data-attr:aria-busy="$media_files.loading && 'true'"
+        {% if not state.can_save %}disabled{% endif %}>
+        Save
+      </button>
+        <button class="ui-button ui-outlined" type="button" data-on:click="$media_files.show_form=false; el.dispatchEvent(new Event('change', { bubbles: true }));">
+        Cancel
+      </button>
+    </div>
+
+      {% else %}
+        {% if state.enabled %}
+    <p class="settings-current-value">
+        Media files older than
+        {% if current.weeks %}{{ current.weeks }} weeks{% endif %}
+        {% if current.days %}{{ current.days }} days{% endif %}
+        are deleted automatically.
+    </p>
+        {% else %}
+    <p class="settings-current-value">Automatic deletion of old media files is disabled.</p>
+        {% endif %}
+      <button class="ui-button ui-outlined" type="button" data-on:click="$media_files.show_form=true; el.dispatchEvent(new Event('change', { bubbles: true }));">Edit</button>
+      {% endif %}
+  </fieldset>
+
+</form>

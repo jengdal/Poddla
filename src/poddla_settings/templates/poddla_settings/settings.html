@@ -1,0 +1,18 @@
+{% extends "podcasts/base.html" %}
+{% block content %}
+<div id="settings-container" data-signals__ifmissing='{{ state_json }}'  data-init="@get('{% url 'settings_sse' %}')">
+
+  <div
+    id="settings-layout"
+    class="settings-layout"
+  >
+    <div class="settings-form-panel">
+    <h1 class="ui-h4">Poddla Settings</h1>
+
+    {% include "poddla_settings/partials/feed_update_form.html" with form=feed_update_context.form state=feed_update_context.state current=feed_update_context.current post_call=feed_update_context.post_call only %}
+    {% include "poddla_settings/partials/media_files_form.html" with form=media_files_context.form state=media_files_context.state current=media_files_context.current post_call=media_files_context.post_call only %}
+    </div>
+  </div>
+
+</div>
+{% endblock content %}
