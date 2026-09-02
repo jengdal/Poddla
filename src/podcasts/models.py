@@ -1,10 +1,11 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from podcasts.youtube import FeedSource
 from valkey_changes.model_publisher import ModelPublisher
 
 podcast_publisher = ModelPublisher("podcasts:feed:updates")
@@ -20,6 +21,38 @@ class PublicPodcastManager(models.Manager):
 class DraftPodcastManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(status="draft")
+
+    def create_draft(self, feed: FeedSource) -> "PodcastFeed":  # noqa: UP037
+        podcast = self.create(
+            source_type=feed.source_type,
+            url=feed.url,
+            name=feed.title,
+            description=feed.description or "",
+            thumbnail=feed.thumbnail or "",
+        )
+        Episode.objects.bulk_create(
+            [
+                Episode(
+                    podcast=podcast,
+                    youtube_id=v.id,
+                    title=v.title,
+                    url=v.url,
+                    duration=v.duration,
+                    thumbnail=v.thumbnail or "",
+                    published_at=datetime.fromtimestamp(v.timestamp, tz=UTC)
+                    if v.timestamp
+                    else None,
+                )
+                for v in feed.videos
+            ]
+        )
+        return podcast
+
+    def publish(self, pk: int) -> "PodcastFeed":  # noqa: UP037
+        channel = self.get(pk=pk)
+        channel.status = PodcastFeed.STATUS_PUBLIC
+        channel.save()
+        return channel
 
 
 class PodcastFeed(models.Model):

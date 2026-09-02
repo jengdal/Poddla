@@ -1,5 +1,3 @@
-from datetime import datetime, timezone
-
 import msgspec
 from asgiref.sync import sync_to_async
 from datastar_py import ServerSentEventGenerator
@@ -14,8 +12,8 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from podcasts.forms import FeedForm
-from podcasts.models import Episode, PodcastFeed
-from podcasts.youtube import FeedSource, fetch_feed
+from podcasts.models import PodcastFeed
+from podcasts.youtube import fetch_feed
 from valkey_changes import valkey_client
 from valkey_changes.changes import changes
 from valkey_changes.state_store import StateStore
@@ -39,41 +37,6 @@ _store: StateStore[AddChannelState] = StateStore(
     namespace="add_channel",
     default_factory=lambda tab_id: AddChannelState(tab_id=tab_id),
 )
-
-
-def create_podcast_feed_draft(feed: FeedSource) -> PodcastFeed:
-    podcast = PodcastFeed.everything.create(
-        status=PodcastFeed.STATUS_DRAFT,
-        source_type=feed.source_type,
-        url=feed.url,
-        name=feed.title,
-        description=feed.description or "",
-        thumbnail=feed.thumbnail or "",
-    )
-    Episode.objects.bulk_create(
-        [
-            Episode(
-                podcast=podcast,
-                youtube_id=v.id,
-                title=v.title,
-                url=v.url,
-                duration=v.duration,
-                thumbnail=v.thumbnail or "",
-                published_at=datetime.fromtimestamp(v.timestamp, tz=timezone.utc)
-                if v.timestamp
-                else None,
-            )
-            for v in feed.videos
-        ]
-    )
-    return podcast
-
-
-def publish_channel(channel_pk: int) -> PodcastFeed:
-    channel = PodcastFeed.everything.get(pk=channel_pk, status=PodcastFeed.STATUS_DRAFT)
-    channel.status = PodcastFeed.STATUS_PUBLIC
-    channel.save()
-    return channel
 
 
 def _sync_render(request: HttpRequest, state: AddChannelState):
@@ -161,7 +124,7 @@ async def set_state(request: HttpRequest):
         if await sync_to_async(form.is_valid)():
             state.can_preview = True
             if save and state.podcast_id:
-                await sync_to_async(publish_channel)(state.podcast_id)
+                await sync_to_async(PodcastFeed.drafts.publish)(state.podcast_id)
                 saved_podcast_id = state.podcast_id
                 state.data = {}
                 state.podcast_id = None
@@ -182,7 +145,7 @@ async def set_state(request: HttpRequest):
                     cache_valkey_client=vk,
                     cache_seconds=settings.YOUTUBE_META_CACHE_SECONDS,
                 )
-                podcast = await sync_to_async(create_podcast_feed_draft)(feed)
+                podcast = await sync_to_async(PodcastFeed.drafts.create_draft)(feed)
                 state.can_save = True
                 state.podcast_id = podcast.id
         else:
