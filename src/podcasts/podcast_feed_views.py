@@ -103,6 +103,8 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
                         # doesn't start multiple concurrent tasks. There's also a process wide lock that ensures
                         # only one feed is updated at a time, so there's no risk the feed is
                         # updated multiple times concurrently.
+                        # TODO: We should probably use a tasks queue for this instead, where failures and such
+                        # can be recorded and surfaced to the user somehow. This will have to do for now tho.
                         update_task = await refresh_podcast_feed_task(
                             podcast=podcast, update_task=update_task
                         )
