@@ -5,8 +5,8 @@ from podcasts.models import PodcastFeed
 
 
 def validate_youtube_url(value):
-    if not value.startswith("https://youtube.com"):
-        raise ValidationError("URL must start with https://youtube.com")
+    if not (value.startswith("https://youtube.com") or value.startswith("https://www.youtube.com")):
+        raise ValidationError("URL must start with https://www.youtube.com")
 
 
 def validate_unique(value):
@@ -25,7 +25,7 @@ class FeedForm(forms.Form):
                 # This gets rid of the client side validation. An invalid form won't get @post'ed.
                 "type": "text",
                 "class": "ui-text-input",
-                "placeholder": "https://youtube.com/channel/...",
+                "placeholder": "https://www.youtube.com/channel/...",
             }
         ),
     )
