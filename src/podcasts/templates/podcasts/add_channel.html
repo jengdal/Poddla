@@ -1,6 +1,6 @@
 {% extends "podcasts/base.html" %}
 {% block content %}
-<div id="add-channel-container" data-signals:tab_id="'{{ state.tab_id }}'" data-init="@get('{% url 'add_channel_sse' %}')">
+<div id="add-channel-container" data-class:loading="$loading" data-signals:tab_id="'{{ state.tab_id }}'" data-init="@get('{% url 'add_channel_sse' %}')">
 
   <div class="add-channel-layout">
     <div class="add-channel-form-panel">
@@ -10,7 +10,7 @@
       id="add-channel-form"
       class="ui-form"
       method="post"
-      data-on:submit="@post('{% url 'add_channel_set_state' %}?preview', {contentType: 'form'})"
+      data-on:submit="$loading=true && @post('{% url 'add_channel_set_state' %}?preview', {contentType: 'form'})"
       data-on:keyup__debounce.200ms__capture="@post('{% url 'add_channel_set_state' %}', {contentType: 'form'})"
     >
       {% csrf_token %}
@@ -43,7 +43,7 @@
       <button
         class="ui-button ui-filled add-channel-create-btn"
         type="button"
-        data-on:click="@post('{% url 'add_channel_set_state' %}?save', {contentType: 'form'})"
+        data-on:click="$loading=true && @post('{% url 'add_channel_set_state' %}?save', {contentType: 'form'})"
       >
         Create a Podcast Feed for "{{ channel.name|truncatechars:32 }}"
       </button>

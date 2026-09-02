@@ -11,6 +11,7 @@ from datastar_py.django import (
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from podcasts.forms import FeedForm
@@ -27,6 +28,7 @@ class AddChannelState(msgspec.Struct):
     can_preview: bool = False
     can_save: bool = False
     podcast_id: int | None = None
+    loading: bool = False
 
 
 _store: StateStore[AddChannelState] = StateStore(
@@ -81,9 +83,7 @@ def sync_render_index(request: HttpRequest, state: AddChannelState):
 
     channel = None
     if state.podcast_id is not None:
-        channel = PodcastFeed.everything.prefetch_related("episodes").get(
-            pk=state.podcast_id
-        )
+        channel = PodcastFeed.everything.prefetch_related("episodes").get(pk=state.podcast_id)
 
     return render_to_string(
         request=request,
@@ -122,9 +122,8 @@ async def add_channel_sse(request: HttpRequest):
             while True:
                 event_id += 1
                 html = await render_index(request=request, state=tab.state)
-                yield ServerSentEventGenerator.patch_elements(
-                    html, event_id=str(event_id)
-                )
+                yield ServerSentEventGenerator.patch_elements(html, event_id=str(event_id))
+                yield ServerSentEventGenerator.patch_signals({"loading": tab.state.loading})
                 await changed.wait()
 
     return DatastarResponse(content=generator())
@@ -149,27 +148,41 @@ async def set_state(request: HttpRequest):
     else:
         state.data = None
     form = FeedForm(data=state.data)
-    if await sync_to_async(form.is_valid)():
-        state.can_preview = True
-        if save and state.podcast_id:
-            await sync_to_async(publish_channel)(state.podcast_id)
-            state.data = {}
-            state.podcast_id = None
+    saved_podcast_id: int | None = None
+    try:
+        if await sync_to_async(form.is_valid)():
+            state.can_preview = True
+            if save and state.podcast_id:
+                await sync_to_async(publish_channel)(state.podcast_id)
+                saved_podcast_id = state.podcast_id
+                state.data = {}
+                state.podcast_id = None
+                state.can_save = False
+                state.can_preview = False
+                return DatastarResponse(
+                    content=(
+                        ServerSentEventGenerator.redirect(
+                            reverse("podcast_feed", args=(saved_podcast_id,))
+                        ),
+                    )
+                )
+            elif preview:
+                state.loading = True
+                await _store.save(tab_id, state)
+                feed = await fetch_feed(
+                    url=form.cleaned_data["url"],
+                    cache_valkey_client=vk,
+                    cache_seconds=settings.YOUTUBE_META_CACHE_SECONDS,
+                )
+                podcast = await sync_to_async(create_podcast_feed_draft)(feed)
+                state.can_save = True
+                state.podcast_id = podcast.id
+        else:
             state.can_save = False
             state.can_preview = False
-        elif preview:
-            feed = await fetch_feed(
-                url=form.cleaned_data["url"],
-                cache_valkey_client=vk,
-                cache_seconds=settings.YOUTUBE_META_CACHE_SECONDS,
-            )
-            podcast = await sync_to_async(create_podcast_feed_draft)(feed)
-            state.can_save = True
-            state.podcast_id = podcast.id
-    else:
-        state.can_save = False
-        state.can_preview = False
-        state.podcast_id = None
+            state.podcast_id = None
+    finally:
+        state.loading = False
+        await _store.save(tab_id, state)
 
-    await _store.save(tab_id, state)
     return HttpResponse(status=204)

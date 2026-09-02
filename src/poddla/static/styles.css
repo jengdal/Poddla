@@ -169,3 +169,32 @@ a.ui-card:hover {
 .add-channel-create-btn {
   width: 100%;
 }
+
+/* Block interaction and show a spinner overlay while loading */
+#add-channel-container.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+#add-channel-container.loading > * {
+  opacity: 0.5;
+}
+
+#add-channel-container.loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 3px solid var(--surface-3);
+  border-block-start-color: var(--text-1);
+  border-radius: 50%;
+  animation: add-channel-spin 0.7s linear infinite;
+}
+
+@keyframes add-channel-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
