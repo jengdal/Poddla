@@ -22,6 +22,8 @@ from valkey_changes.state_store import StateStore
 
 
 class AddChannelState(msgspec.Struct):
+    """This holds the state for a browser tab on this page."""
+
     tab_id: str
     data: dict[str, str | list[str]] | None = None
     can_preview: bool = False
@@ -30,6 +32,8 @@ class AddChannelState(msgspec.Struct):
     loading: bool = False
 
 
+# The states are stored in valkey by StateStore. The SSE HTML renderer below
+# can listen for changes to a tabs state and re-render when it changes.
 _store: StateStore[AddChannelState] = StateStore(
     AddChannelState,
     namespace="add_channel",
@@ -72,7 +76,10 @@ def publish_channel(channel_pk: int) -> PodcastFeed:
     return channel
 
 
-def sync_render_index(request: HttpRequest, state: AddChannelState):
+def _sync_render(request: HttpRequest, state: AddChannelState):
+    # HTML rendering in Django has to be done in a sync context, the
+    # templatetags and any querysets executed from within the templating system
+    # all assume sync.
     if state.data:
         form = FeedForm(data=state.data)
         if form.is_valid():
@@ -95,13 +102,13 @@ def sync_render_index(request: HttpRequest, state: AddChannelState):
     )
 
 
-async def render_index(request: HttpRequest, state: AddChannelState):
-    return await sync_to_async(sync_render_index)(request=request, state=state)
+async def _render(request: HttpRequest, state: AddChannelState):
+    return await sync_to_async(_sync_render)(request=request, state=state)
 
 
 async def add_channel(request: HttpRequest):
     state = await _store.new(request.user.id)
-    return HttpResponse(await render_index(request=request, state=state))
+    return HttpResponse(await _render(request=request, state=state))
 
 
 async def add_channel_sse(request: HttpRequest):
@@ -114,12 +121,15 @@ async def add_channel_sse(request: HttpRequest):
     async def generator():
         event_id = 0
         tab = _store.subscribe(tab_id, request.user.id)
-        # changes() reads the state as it starts, so the first pass through the loop is the
-        # "send current state immediately on connect" one.
+        # We'll get the current state immediately on subscribe. That means
+        # we'll likely send down the exact HTML the browser has already
+        # rendered, but the overhead is practically nothing and this way we
+        # "prime" the brotli compression window "in the background", which
+        # means the next real change will arrive at the client using less data.
         async with changes(tab) as changed:
             while True:
                 event_id += 1
-                html = await render_index(request=request, state=tab.state)
+                html = await _render(request=request, state=tab.state)
                 yield ServerSentEventGenerator.patch_elements(html, event_id=str(event_id))
                 yield ServerSentEventGenerator.patch_signals({"loading": tab.state.loading})
                 await changed.wait()
