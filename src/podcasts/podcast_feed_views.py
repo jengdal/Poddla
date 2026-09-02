@@ -46,7 +46,7 @@ _store: StateStore[PodcastFeedState] = StateStore(
 )
 
 
-def sync_render_index(request: HttpRequest, state: PodcastFeedState, podcast: PodcastFeed):
+def _sync_render(request: HttpRequest, state: PodcastFeedState, podcast: PodcastFeed):
     episodes = list(podcast.episodes.order_by("-published_at"))
     return render_to_string(
         request=request,
@@ -59,8 +59,8 @@ def sync_render_index(request: HttpRequest, state: PodcastFeedState, podcast: Po
     )
 
 
-async def render_index(request: HttpRequest, state: PodcastFeedState, podcast: PodcastFeed):
-    return await sync_to_async(sync_render_index)(request=request, state=state, podcast=podcast)
+async def _render(request: HttpRequest, state: PodcastFeedState, podcast: PodcastFeed):
+    return await sync_to_async(_sync_render)(request=request, state=state, podcast=podcast)
 
 
 async def podcast_feed(request: HttpRequest, podcast_id: int):
@@ -68,7 +68,7 @@ async def podcast_feed(request: HttpRequest, podcast_id: int):
     state = await _store.new(request.user.id)
     state.podcast_id = podcast_id
     await _store.save(state.tab_id, state, request.user.id)
-    return HttpResponse(await render_index(request=request, state=state, podcast=podcast))
+    return HttpResponse(await _render(request=request, state=state, podcast=podcast))
 
 
 async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
@@ -109,7 +109,7 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
                         # If the task finds new episodes we'll be notified about it through `podcast_publisher`.
 
                     event_id += 1
-                    html = await render_index(request=request, state=tab.state, podcast=podcast)
+                    html = await _render(request=request, state=tab.state, podcast=podcast)
                     yield ServerSentEventGenerator.patch_elements(html, event_id=str(event_id))
                     # Limit the FPS. When a lot of episodes are created we can get a lot of events at
                     # once and don't want to create a new "frame" for each one:

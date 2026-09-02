@@ -26,7 +26,7 @@ _store: StateStore[PodcastsState] = StateStore(
 )
 
 
-def sync_render_index(request: HttpRequest, state: PodcastsState):
+def _sync_render(request: HttpRequest, state: PodcastsState):
     return render_to_string(
         request=request,
         template_name="podcasts/podcasts.html",
@@ -37,13 +37,13 @@ def sync_render_index(request: HttpRequest, state: PodcastsState):
     )
 
 
-async def render_index(request: HttpRequest, state: PodcastsState):
-    return await sync_to_async(sync_render_index)(request=request, state=state)
+async def _render(request: HttpRequest, state: PodcastsState):
+    return await sync_to_async(_sync_render)(request=request, state=state)
 
 
 async def podcasts(request: HttpRequest):
     state = await _store.new(request.user.id)
-    return HttpResponse(await render_index(request=request, state=state))
+    return HttpResponse(await _render(request=request, state=state))
 
 
 async def podcasts_sse(request: HttpRequest):
@@ -63,7 +63,7 @@ async def podcasts_sse(request: HttpRequest):
             while True:
                 # Send the current state immediately, this primes the compression on the SSE stream:
                 event_id += 1
-                html = await render_index(request=request, state=tab.state)
+                html = await _render(request=request, state=tab.state)
                 yield ServerSentEventGenerator.patch_elements(html, event_id=str(event_id))
                 # Limit the FPS. When a lot of episodes are created we can get a lot of events at
                 # once and don't want to create a new "frame" for each one:
