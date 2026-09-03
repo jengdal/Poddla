@@ -1,16 +1,17 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
 from podcasts.youtube import FeedSource
+from poddla_settings.models import PoddlaSettings
 from valkey_changes.model_publisher import ModelPublisher
 
 podcast_publisher = ModelPublisher("podcasts:feed:updates")
 episode_publisher = ModelPublisher("episodes:feed:updates")
-PODCAST_FEED_OLD_MINUTES = 5
 
 
 class PublicPodcastManager(models.Manager):
@@ -81,7 +82,11 @@ class PodcastFeed(models.Model):
     everything = models.Manager()
 
     def needs_updating(self) -> bool:
-        return self.updated_at + timedelta(minutes=PODCAST_FEED_OLD_MINUTES) <= timezone.now()
+        return async_to_sync(self.aneeds_updating)()
+
+    async def aneeds_updating(self) -> bool:
+        settings = await PoddlaSettings.objects.aget_settings()
+        return self.updated_at + settings.min_feed_update_freq <= timezone.now()
 
     class Meta:
         constraints = [

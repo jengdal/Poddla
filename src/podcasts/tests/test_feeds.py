@@ -26,9 +26,10 @@ class PodcastFeedRssTests(TestCase):
             source_type="channel",
         )
         # A freshly created podcast isn't stale yet (needs_updating() is False), and the
-        # view only bothers refreshing a stale one - make it look old enough to refresh:
+        # view only bothers refreshing a stale one - make it look old enough to refresh.
+        # Must exceed PoddlaSettings' default min_feed_update_freq (30 minutes):
         PodcastFeed.everything.filter(pk=self.podcast.pk).update(
-            updated_at=timezone.now() - timedelta(minutes=10)
+            updated_at=timezone.now() - timedelta(minutes=45)
         )
         self.episode = Episode.objects.create(
             podcast=self.podcast,

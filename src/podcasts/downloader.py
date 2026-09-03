@@ -55,7 +55,7 @@ async def refresh_podcast_feed_task(
 async def refresh_podcast_feed(podcast: PodcastFeed) -> None:
     async with _feed_download_lock:
         podcast = await PodcastFeed.objects.aget(pk=podcast.pk)
-        if not podcast.needs_updating():
+        if not await podcast.aneeds_updating():
             return
         await _refresh_podcast_feed(podcast=podcast)
 

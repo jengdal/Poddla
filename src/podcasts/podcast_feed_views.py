@@ -97,7 +97,7 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
                         yield ServerSentEventGenerator.redirect("./")
                         return
 
-                    if podcast.needs_updating():
+                    if await podcast.aneeds_updating():
                         # This starts a background task unless update_task is still running.
                         # The only purpose of update_task is to make sure this particular SSE connection
                         # doesn't start multiple concurrent tasks. There's also a process wide lock that ensures
