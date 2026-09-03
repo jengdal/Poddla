@@ -94,7 +94,9 @@ async def add_channel_sse(request: HttpRequest):
                 event_id += 1
                 html = await _render(request=request, state=tab.state)
                 yield ServerSentEventGenerator.patch_elements(html, event_id=str(event_id))
-                yield ServerSentEventGenerator.patch_signals({"loading": tab.state.loading})
+                yield ServerSentEventGenerator.patch_signals(
+                    {"loading": tab.state.loading, "can_preview": tab.state.can_preview}
+                )
                 await changed.wait()
 
     return DatastarResponse(content=generator())
@@ -138,8 +140,6 @@ async def set_state(request: HttpRequest):
                     )
                 )
             elif preview:
-                state.loading = True
-                await _store.save(tab_id, state, request.user.id)
                 feed = await fetch_feed(
                     url=form.cleaned_data["url"],
                     cache_valkey_client=vk,

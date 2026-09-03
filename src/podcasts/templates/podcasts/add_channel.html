@@ -34,7 +34,9 @@
         <button
           class="ui-button ui-filled"
           type="submit"
-          {% if not state.can_preview %}disabled{% endif %}>
+          data-attr:aria-busy="$loading && 'true'"
+          data-attr:disabled="($loading || !$can_preview)"
+          >
           Preview
         </button>
       </div>
