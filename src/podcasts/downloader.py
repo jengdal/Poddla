@@ -16,6 +16,9 @@ from podcasts.youtube.video import download_audio
 from valkey_changes import valkey_client
 from valkey_changes.changes import changes
 
+# When refreshing a YT channel we fetch at most this many video entries initially. If we only find new entries within those, we fetch more.
+YOUTUBE_CHANNEL_REFRESH_LIMIT = 10
+
 logger = logging.getLogger(__name__)
 
 # We throttle YT requests, we only allow:
@@ -23,14 +26,16 @@ logger = logging.getLogger(__name__)
 # - A single channel/playlist metadata download _from YT_ at a time.
 #
 # NOTE: however that users of Poddla can still download/stream multiple
-# concurrent audio files and podcast feeds. It is only the requests to YT that
-# are throttled. I think this limitation is perfectly fine for a self-hosted
-# service meant for personal use. I think it's sensible to not send too many
-# concurrent requests to YT for obvious reasons. The locking mechanism relies
-# on there only being a single Poddla worker process, which is the case if you
-# follow the deploy instructions. I may refactor this in the future to make it
-# possible to allow more than one download at a time, but that will probably
-# require a task queue.
+# concurrent audio files and podcast feeds from Poddla itself, as they are
+# cached in Poddla. It is only the requests to YT that are throttled. I think
+# this limitation is perfectly fine for a self-hosted service meant for
+# personal use. I think it's sensible to not send too many concurrent requests
+# to YT for obvious reasons.
+#
+# The locking mechanism relies on there only being a single Poddla worker
+# process, which is the case if you follow the deploy instructions. I may
+# refactor this in the future to make it possible to allow more than one
+# download at a time, but that will probably require a task queue.
 _audio_download_lock = asyncio.Lock()
 _feed_download_lock = asyncio.Lock()
 
@@ -43,12 +48,9 @@ def _refresh_podcast_feed_cleanup(task: asyncio.Task[None]) -> None:
         logger.error("The podcast feed update task failed.", exc_info=error)
 
 
-async def refresh_podcast_feed_task(
-    podcast: PodcastFeed, update_task: asyncio.Task[None] | None
-) -> asyncio.Task[None]:
-    if not update_task or update_task.done():
-        update_task = asyncio.create_task(refresh_podcast_feed(podcast=podcast))
-        update_task.add_done_callback(_refresh_podcast_feed_cleanup)
+async def refresh_podcast_feed_task(podcast: PodcastFeed) -> asyncio.Task[None]:
+    update_task = asyncio.create_task(refresh_podcast_feed(podcast=podcast))
+    update_task.add_done_callback(_refresh_podcast_feed_cleanup)
     return update_task
 
 
@@ -60,11 +62,14 @@ async def refresh_podcast_feed(podcast: PodcastFeed) -> None:
         await _refresh_podcast_feed(podcast=podcast)
 
 
-async def _refresh_podcast_feed(podcast: PodcastFeed) -> None:
+async def _fetch_and_update(podcast: PodcastFeed, entries_limit: int):
+    found_old_ep = False
+
     feed = await fetch_feed(
         url=str(podcast.url),
         cache_valkey_client=await valkey_client.get_client(),
         cache_seconds=settings.YOUTUBE_META_CACHE_SECONDS,
+        entries_limit=entries_limit,
     )
 
     podcast.name = feed.title
@@ -74,7 +79,7 @@ async def _refresh_podcast_feed(podcast: PodcastFeed) -> None:
 
     for v in feed.videos:
         published_at = datetime.fromtimestamp(v.timestamp, tz=timezone.utc) if v.timestamp else None
-        await Episode.objects.aupdate_or_create(
+        _, created = await Episode.objects.aupdate_or_create(
             podcast=podcast,
             url=v.url,
             defaults={"title": v.title},
@@ -89,6 +94,21 @@ async def _refresh_podcast_feed(podcast: PodcastFeed) -> None:
                 "published_at": published_at,
             },
         )
+        if not created:
+            found_old_ep = True
+    return found_old_ep
+
+
+async def _refresh_podcast_feed(podcast: PodcastFeed) -> None:
+    found_old_ep = await _fetch_and_update(
+        podcast=podcast, entries_limit=YOUTUBE_CHANNEL_REFRESH_LIMIT
+    )
+    if not found_old_ep:
+        logger.debug(
+            f"Did not find an old episode within the newest {YOUTUBE_CHANNEL_REFRESH_LIMIT} entries, which means we're now fetching more, gotta catch them all."
+        )
+        # TODO: make the limit configurable on the podcast model:
+        found_old_ep = await _fetch_and_update(podcast=podcast, entries_limit=500)
 
 
 async def download_episode_media(episode: Episode) -> Episode:

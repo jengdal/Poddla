@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.feedgenerator import Rss201rev2Feed
 
-from podcasts.downloader import refresh_podcast_feed
+from podcasts.downloader import refresh_podcast_feed_task
 from user_settings.authenticated_urls import build_authenticated_url
 from user_settings.basic_auth import authenticate_basic_auth, basic_auth_challenge
 
@@ -77,6 +77,11 @@ class PodcastRssFeed(Rss201rev2Feed):
             handler.endElement("itunes:image")
 
 
+async def refresh_and_wait(podcast: PodcastFeed):
+    task = await refresh_podcast_feed_task(podcast=podcast)
+    await task
+
+
 @login_not_required
 class PodcastFeedRss(Feed):
     """Serves the RSS feed.
@@ -102,7 +107,8 @@ class PodcastFeedRss(Feed):
         if podcast.needs_updating():
             logger.debug("Going to update the PodcastFeed (%s)", podcast.id)
             try:
-                async_to_sync(refresh_podcast_feed)(podcast=podcast)
+                # If this request is cancelled the task created in the below method will continue until it completes or errors.
+                async_to_sync(refresh_and_wait)(podcast=podcast)
             except Exception:
                 # Just log the fail and serve what we already have.
                 logger.exception(

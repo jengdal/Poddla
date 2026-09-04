@@ -1,10 +1,13 @@
-from typing import Literal
+import logging
+from typing import Any, Literal
 
 import msgspec
 import yt_dlp
 from glide import GlideClient
 
 from podcasts.youtube._cache import YOUTUBE_CACHE_KEY_PREFIX, run_cached
+
+logger = logging.getLogger(__name__)
 
 
 class VideoInfo(msgspec.Struct):
@@ -31,13 +34,16 @@ class FeedSource(msgspec.Struct):
     video_count: int | None = None
 
 
-def _extract_info(url: str) -> dict:
-    opts = {
+def _extract_info(url: str, entries_limit: int | None) -> dict:
+    opts: dict[str, Any] = {
         "quiet": True,
         "extract_flat": True,
         "ignoreerrors": True,
         "extractor_args": {"youtubetab": {"approximate_date": ["True"]}},
     }
+    if entries_limit:
+        # Only fetch this many "entries", videos etc.
+        opts["playlistend"] = entries_limit
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info(url, download=False) or {}
 
@@ -48,14 +54,20 @@ def _get_thumbnail(thumbnails: list[dict] | None) -> str | None:
     return thumbnails[-1].get("url")
 
 
+def _yt_cache_key(url: str, entries_limit: int | None):
+    return f"{YOUTUBE_CACHE_KEY_PREFIX}{url}:{entries_limit}"
+
+
 async def fetch_feed(
     url: str,
+    entries_limit: int | None = None,
     cache_valkey_client: GlideClient | None = None,
     cache_seconds: int = 3600,
 ) -> FeedSource:
+    original_url = url
     info = await run_cached(
-        f"{YOUTUBE_CACHE_KEY_PREFIX}{url}",
-        lambda: _extract_info(url),
+        _yt_cache_key(url, entries_limit),
+        lambda: _extract_info(url, entries_limit=entries_limit),
         cache_valkey_client,
         cache_seconds,
     )
@@ -69,9 +81,13 @@ async def fetch_feed(
             (e for e in entries if "Videos" in (e.get("title") or "")),
             entries[0],
         )
+        url = str(videos_tab["webpage_url"])
+        if not url:
+            raise Exception(f"Could not find the URL to the Videos tab on {original_url}")
+        logger.debug("Using %s instead of %s.", url, original_url)
         info = await run_cached(
-            f"{YOUTUBE_CACHE_KEY_PREFIX}{videos_tab['webpage_url']}",
-            lambda: _extract_info(videos_tab["webpage_url"]),
+            _yt_cache_key(url, entries_limit),
+            lambda: _extract_info(url, entries_limit=entries_limit),
             cache_valkey_client,
             cache_seconds,
         )
