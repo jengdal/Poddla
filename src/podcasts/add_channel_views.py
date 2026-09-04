@@ -1,3 +1,5 @@
+import asyncio
+
 import msgspec
 from asgiref.sync import sync_to_async
 from datastar_py import ServerSentEventGenerator
@@ -7,8 +9,10 @@ from datastar_py.django import (
 )
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
+from django.middleware.csrf import get_token
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils.html import mark_safe
 from django.views.decorators.http import require_POST
 
 from podcasts.forms import FeedForm
@@ -28,6 +32,18 @@ class AddChannelState(msgspec.Struct):
     can_save: bool = False
     podcast_id: int | None = None
     loading: bool = False
+    saving: bool = False
+    preview: bool = False
+
+    def to_signals(self):
+        return {
+            "tab_id": self.tab_id,
+            "can_preview": self.can_preview,
+            "can_save": self.can_save,
+            "loading": self.loading,
+            "saving": self.saving,
+            "preview": self.preview,
+        }
 
 
 # The states are stored in valkey by StateStore. The SSE HTML renderer below
@@ -54,13 +70,18 @@ def _sync_render(request: HttpRequest, state: AddChannelState):
     if state.podcast_id is not None:
         channel = PodcastFeed.everything.prefetch_related("episodes").get(pk=state.podcast_id)
 
+    csrf_token = get_token(request)
     return render_to_string(
         request=request,
         template_name="podcasts/add_channel.html",
         context={
             "state": state,
+            "state_json": mark_safe(msgspec.json.encode(state.to_signals()).decode("utf-8")),
             "form": form,
             "channel": channel,
+            "post_call": mark_safe(
+                f"@post('{reverse('add_channel_set_state')}', {{'headers': {{'x-csrftoken': '{csrf_token}'}}}})"
+            ),
         },
     )
 
@@ -94,9 +115,7 @@ async def add_channel_sse(request: HttpRequest):
                 event_id += 1
                 html = await _render(request=request, state=tab.state)
                 yield ServerSentEventGenerator.patch_elements(html, event_id=str(event_id))
-                yield ServerSentEventGenerator.patch_signals(
-                    {"loading": tab.state.loading, "can_preview": tab.state.can_preview}
-                )
+                yield ServerSentEventGenerator.patch_signals(tab.state.to_signals())
                 await changed.wait()
 
     return DatastarResponse(content=generator())
@@ -104,29 +123,32 @@ async def add_channel_sse(request: HttpRequest):
 
 @require_POST
 async def set_state(request: HttpRequest):
-    # We post using datastars "form" contentType, it leaves out signals so we use a tab_id input
-    # element instead:
-    tab_id = request.POST.get("tab_id", None)
-    if not tab_id:
+    signals = read_signals(request)
+    if not signals:
         # TODO: Add this to the state and show a toast error or something.
         raise Exception()
-    tab_id = str(tab_id)
-    save = "save" in request.GET
-    preview = "preview" in request.GET
-
+    tab_id = signals["tab_id"]
     vk = await valkey_client.get_client()
     state = await _store.get(tab_id, request.user.id)
-    if request.POST.get("url", None):
-        state.data = dict(request.POST.items())
-    else:
-        state.data = None
+
+    state.data = {"url": signals.get("url", "")}
+    state.saving = signals.get("saving", False)
+    state.preview = signals.get("preview", False)
+    state.loading = signals.get("loading", False)
+
     form = FeedForm(data=state.data)
     saved_podcast_id: int | None = None
     try:
         if await sync_to_async(form.is_valid)():
             state.can_preview = True
-            if save and state.podcast_id:
-                await sync_to_async(PodcastFeed.drafts.publish)(state.podcast_id)
+            if state.saving and state.podcast_id:
+                # Publish first before we kick off the refresh task, this way
+                # the user has a chance to see the podcast while a slow refresh
+                # is taking place:
+                podcast = await sync_to_async(PodcastFeed.drafts.publish)(state.podcast_id)
+
+                # TODO: Full refresh of the feed.
+
                 saved_podcast_id = state.podcast_id
                 state.data = {}
                 state.podcast_id = None
@@ -139,13 +161,16 @@ async def set_state(request: HttpRequest):
                         ),
                     )
                 )
-            elif preview:
+            elif state.preview:
                 feed = await fetch_feed(
                     url=form.cleaned_data["url"],
                     cache_valkey_client=vk,
                     cache_seconds=settings.YOUTUBE_META_CACHE_SECONDS,
+                    entries_limit=10,
                 )
+                await asyncio.sleep(3)
                 podcast = await sync_to_async(PodcastFeed.drafts.create_draft)(feed)
+
                 state.can_save = True
                 state.podcast_id = podcast.id
         else:
@@ -154,6 +179,8 @@ async def set_state(request: HttpRequest):
             state.podcast_id = None
     finally:
         state.loading = False
+        state.saving = False
+        state.preview = False
         await _store.save(tab_id, state, request.user.id)
 
     return HttpResponse(status=204)

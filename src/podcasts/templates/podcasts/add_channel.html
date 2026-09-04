@@ -1,6 +1,11 @@
 {% extends "podcasts/base.html" %}
 {% block content %}
-<div id="add-channel-container" data-class:loading="$loading" data-signals:tab_id="'{{ state.tab_id }}'" data-init="@get('{% url 'add_channel_sse' %}')">
+<div
+  id="add-channel-container"
+  data-class:loading="$loading"
+  data-signals__ifmissing='{{ state_json }}'
+  data-init="@get('{% url 'add_channel_sse' %}')"
+  >
 
   <div class="add-channel-layout">
     <div class="add-channel-form-panel">
@@ -9,17 +14,14 @@
     <form
       id="add-channel-form"
       class="ui-form"
-      method="post"
-      data-on:submit="$loading=true && @post('{% url 'add_channel_set_state' %}?preview', {contentType: 'form'})"
-      data-on:keyup__debounce.200ms__capture="@post('{% url 'add_channel_set_state' %}', {contentType: 'form'})"
+      data-ref="_form"
+      data-on:submit__capture="$loading=true; $preview=!$saving; {{ post_call }}"
+      data-on:keyup__debounce.200ms__capture="(!$loading && {{ post_call }})"
     >
-      {% csrf_token %}
-      <input name="tab_id" value="{{ state.tab_id }}" type="hidden" />
-
       <div class="ui-text-field" {% if form.url.errors %}data-invalid{% endif %}>
         <label for="{{ form.url.id_for_label }}">YouTube URL</label>
         <div class="ui-field">
-          {{ form.url }}
+          <input type="text" id="{{ form.url.id_for_label }}" name="url" data-bind='url' />
         </div>
         {% if form.url.errors %}
           <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
@@ -45,7 +47,9 @@
       <button
         class="ui-button ui-filled add-channel-create-btn"
         type="button"
-        data-on:click="$loading=true && @post('{% url 'add_channel_set_state' %}?save', {contentType: 'form'})"
+        data-attr:aria-busy="$saving && 'true'"
+        data-attr:disabled="($loading || $saving)"
+        data-on:click="$saving=true; $_form.requestSubmit()"
       >
         Create a Podcast Feed for "{{ channel.name|truncatechars:32 }}"
       </button>
