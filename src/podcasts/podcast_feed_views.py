@@ -106,7 +106,7 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
                         # TODO: We should probably use a tasks queue for this instead, where failures and such
                         # can be recorded and surfaced to the user somehow. This will have to do for now tho.
                         if not update_task or update_task.done():
-                            update_task = await refresh_podcast_feed_task(podcast=podcast)
+                            update_task = refresh_podcast_feed_task(podcast=podcast)
                         # If the task finds new episodes we'll be notified about it through `podcast_publisher`.
 
                     event_id += 1

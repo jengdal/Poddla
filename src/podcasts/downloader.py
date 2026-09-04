@@ -48,7 +48,7 @@ def _refresh_podcast_feed_cleanup(task: asyncio.Task[None]) -> None:
         logger.error("The podcast feed update task failed.", exc_info=error)
 
 
-async def refresh_podcast_feed_task(podcast: PodcastFeed) -> asyncio.Task[None]:
+def refresh_podcast_feed_task(podcast: PodcastFeed) -> asyncio.Task[None]:
     update_task = asyncio.create_task(refresh_podcast_feed(podcast=podcast))
     update_task.add_done_callback(_refresh_podcast_feed_cleanup)
     return update_task
