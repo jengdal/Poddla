@@ -1,5 +1,4 @@
-import json
-
+import msgspec
 from asgiref.sync import sync_to_async
 from datastar_py import ServerSentEventGenerator
 from datastar_py.django import (
@@ -77,7 +76,7 @@ def _sync_render(
         request=request,
         template_name="poddla_settings/settings.html",
         context={
-            "state_json": mark_safe(json.dumps(signals)),
+            "state_json": mark_safe(msgspec.json.encode(signals).decode("utf-8")),
             "feed_update_context": feed_update_context,
             "media_files_context": media_files_context,
         },
