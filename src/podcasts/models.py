@@ -52,7 +52,7 @@ class DraftPodcastManager(models.Manager):
     def publish(self, pk: int) -> "PodcastFeed":  # noqa: UP037
         channel = self.get(pk=pk)
         channel.status = PodcastFeed.STATUS_PUBLIC
-        channel.save()
+        channel.save(update_fields=["status", "updated_at"])
         return channel
 
 
