@@ -4,7 +4,7 @@
   method="post"
   data-class:loading="$media_files.loading"
   data-on:submit="$media_files.loading=true; $media_files.save=true; {{ post_call }}"
-  data-on:keyup__debounce.200ms__capture="{{ post_call }}"
+  data-on:keyup__debounce.200ms__capture="(!$media_files.loading && {{ post_call }})"
   data-on:change__capture="{{ post_call }}"
 >
   <fieldset class="settings-field-group">
