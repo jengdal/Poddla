@@ -1,11 +1,14 @@
+import asyncio
 import logging
+from typing import Any
 
-from asgiref.sync import async_to_sync
+from asgiref.sync import sync_to_async
 from django.contrib.auth.decorators import login_not_required
-from django.contrib.syndication.views import Feed
-from django.shortcuts import get_object_or_404
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import aget_object_or_404
 from django.urls import reverse
-from django.utils.feedgenerator import Rss201rev2Feed
+from django.utils.feedgenerator import Enclosure, Rss201rev2Feed
+from django.utils.http import http_date
 
 from podcasts.downloader import refresh_podcast_feed_task
 from user_settings.authenticated_urls import build_authenticated_url
@@ -77,13 +80,15 @@ class PodcastRssFeed(Rss201rev2Feed):
             handler.endElement("itunes:image")
 
 
-async def refresh_and_wait(podcast: PodcastFeed):
-    task = await refresh_podcast_feed_task(podcast=podcast)
-    await task
+_tasks: set[asyncio.Task[Any]] = set()
+
+
+def _cleanup_task(task: asyncio.Task[Any]):
+    _tasks.remove(task)
 
 
 @login_not_required
-class PodcastFeedRss(Feed):
+async def podcast_feed_rss(request: HttpRequest, podcast_id: int):
     """Serves the RSS feed.
 
     HTTP Basic auth so that podcast apps can auth using the users basic auth
@@ -91,83 +96,62 @@ class PodcastFeedRss(Feed):
     want to serve this freely on the internet and doubt any podcast apps can do
     a web app login flow.
     """
+    user = await sync_to_async(authenticate_basic_auth)(request)
+    if user is None:
+        return basic_auth_challenge()
 
-    feed_type = PodcastRssFeed
+    podcast = await aget_object_or_404(PodcastFeed.objects, pk=podcast_id)
+    if await podcast.aneeds_updating():
+        logger.debug("Going to update the PodcastFeed (%s)", podcast.id)
+        update_task = refresh_podcast_feed_task(podcast=podcast)
+        update_task.add_done_callback(_cleanup_task)
+        # We have to keep a reference to the task so that it doesn't get
+        # garbage collected, in case this request gets cancelled.
+        _tasks.add(update_task)
 
-    def __call__(self, request, *args, **kwargs):
-        user = authenticate_basic_auth(request)
-        if user is None:
-            return basic_auth_challenge()
-        self.auth_user = user
-        return super().__call__(request, *args, **kwargs)
+        # Wait for the task. If the request gets cancelled `shield` will
+        # protect it from also being cancelled, we want it to complete so that
+        # it's fresh when the client retries.
+        await asyncio.shield(update_task)
+        await podcast.arefresh_from_db()
 
-    def get_object(self, request, podcast_id):
-        self.request = request
-        podcast = get_object_or_404(PodcastFeed.objects, pk=podcast_id)
-        if podcast.needs_updating():
-            logger.debug("Going to update the PodcastFeed (%s)", podcast.id)
-            try:
-                # If this request is cancelled the task created in the below method will continue until it completes or errors.
-                async_to_sync(refresh_and_wait)(podcast=podcast)
-            except Exception:
-                # Just log the fail and serve what we already have.
-                logger.exception(
-                    "Failed to update the PodcastFeed (%s) from the source. Serving what we have.",
-                    podcast.id,
-                )
-            podcast.refresh_from_db()
-        return podcast
+    feed = PodcastRssFeed(
+        title=podcast.name,
+        link=request.build_absolute_uri(reverse("podcast_feed", args=[podcast.pk])),
+        description=podcast.description or "",
+        feed_url=request.build_absolute_uri(request.path),
+        itunes_image=podcast.thumbnail or None,
+        itunes_author=podcast.name,
+    )
 
-    def title(self, obj):
-        return obj.name
-
-    def description(self, obj):
-        return obj.description or ""
-
-    def link(self, obj):
-        return reverse("podcast_feed", args=[obj.pk])
-
-    def items(self, obj):
-        return obj.episodes.order_by("-published_at")
-
-    def item_title(self, item):
-        return item.title
-
-    def item_description(self, item):
-        return item.show_notes
-
-    def item_pubdate(self, item):
-        return item.published_at
-
-    def item_link(self, item):
-        return item.url
-
-    def item_enclosure_url(self, item):
-        return build_authenticated_url(
-            request=self.request,
-            username=self.auth_user.username,
-            basic_auth_password=self.auth_user.user_settings.basic_auth_password,
+    async for episode in podcast.episodes.order_by("-published_at"):
+        episode_file = episode.file_exists()
+        if episode_file:
+            enclosure_length = episode_file.stat().st_size
+        else:
+            enclosure_length = 0
+        enclosure_url = build_authenticated_url(
+            request=request,
+            username=user.username,
+            basic_auth_password=user.user_settings.basic_auth_password,
             view_name="podcast_episode_media",
-            args=(item.pk,),
+            args=(episode.pk,),
+        )
+        feed.add_item(
+            title=episode.title,
+            link=episode.url,
+            description=episode.show_notes,
+            pubdate=episode.published_at,
+            unique_id=episode.url,
+            enclosures=[
+                Enclosure(url=enclosure_url, length=str(enclosure_length), mime_type="audio/mp4")
+            ],
+            itunes_duration=_format_duration(episode.duration),
+            itunes_summary=episode.show_notes,
+            itunes_image=episode.thumbnail or None,
         )
 
-    def item_enclosure_length(self, item):
-        if episode_file := item.file_exists():
-            return episode_file.stat().st_size
-        return 0
-
-    def item_enclosure_mime_type(self, item):
-        return "audio/mp4"
-
-    def item_extra_kwargs(self, item):
-        return {
-            "itunes_duration": _format_duration(item.duration),
-            "itunes_summary": item.show_notes,
-            "itunes_image": item.thumbnail or None,
-        }
-
-    def feed_extra_kwargs(self, obj):
-        return {
-            "itunes_image": obj.thumbnail or None,
-            "itunes_author": obj.name,
-        }
+    response = HttpResponse(content_type=feed.content_type)
+    response.headers["Last-Modified"] = http_date(feed.latest_post_date().timestamp())
+    feed.write(response, "utf-8")
+    return response

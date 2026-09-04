@@ -1,7 +1,6 @@
 from django.urls import path
 
-from . import add_channel_views, podcast_feed_views, podcasts_views
-from .feeds import PodcastFeedRss
+from . import add_channel_views, feeds, podcast_feed_views, podcasts_views
 
 urlpatterns = [
     path("", podcasts_views.podcasts, name="podcasts"),
@@ -18,7 +17,7 @@ urlpatterns = [
     ),
     path(
         "p/<int:podcast_id>/rss/",
-        PodcastFeedRss(),
+        feeds.podcast_feed_rss,
         name="podcast_feed_rss",
     ),
     path(
