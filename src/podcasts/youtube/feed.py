@@ -36,6 +36,10 @@ class FeedSource(msgspec.Struct):
 
 def _extract_info(url: str, entries_limit: int | None) -> dict:
     opts: dict[str, Any] = {
+        # TODO: Pass a custom logger object.
+        # "verbose": True,
+        # "quiet": False,
+        # "no_warnings": False,
         "quiet": True,
         "extract_flat": True,
         "ignoreerrors": True,
