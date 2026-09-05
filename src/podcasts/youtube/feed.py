@@ -62,6 +62,28 @@ def _yt_cache_key(url: str, entries_limit: int | None):
     return f"{YOUTUBE_CACHE_KEY_PREFIX}{url}:{entries_limit}"
 
 
+def _get_videos(entries: list[dict[str, Any]]) -> list[VideoInfo]:
+    videos: list[VideoInfo] = []
+    for e in entries:
+        id = e.get("id")
+        title = e.get("title")
+        if not id or not title:
+            # No title can mean it's private.
+            continue
+        videos.append(
+            VideoInfo(
+                id=id,
+                title=title,
+                url=e.get("url") or f"https://www.youtube.com/watch?v={id}",
+                duration=e.get("duration"),
+                view_count=e.get("view_count"),
+                thumbnail=_get_thumbnail(e.get("thumbnails")),
+                timestamp=e.get("timestamp"),
+            )
+        )
+    return videos
+
+
 async def fetch_feed(
     url: str,
     entries_limit: int | None = None,
@@ -103,20 +125,7 @@ async def fetch_feed(
     source_type: Literal["channel", "playlist"] = (
         "playlist" if info.get("webpage_url_basename") == "playlist" else "channel"
     )
-
-    videos = [
-        VideoInfo(
-            id=e["id"],
-            title=e.get("title") or "",
-            url=e.get("url") or f"https://www.youtube.com/watch?v={e['id']}",
-            duration=e.get("duration"),
-            view_count=e.get("view_count"),
-            thumbnail=_get_thumbnail(e.get("thumbnails")),
-            timestamp=e.get("timestamp"),
-        )
-        for e in entries
-        if e.get("id")
-    ]
+    videos = _get_videos(entries)
 
     return FeedSource(
         url=url,
