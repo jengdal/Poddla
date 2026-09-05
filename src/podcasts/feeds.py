@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import Any
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth.decorators import login_not_required
@@ -80,13 +79,6 @@ class PodcastRssFeed(Rss201rev2Feed):
             handler.endElement("itunes:image")
 
 
-_tasks: set[asyncio.Task[Any]] = set()
-
-
-def _cleanup_task(task: asyncio.Task[Any]):
-    _tasks.remove(task)
-
-
 @login_not_required
 async def podcast_feed_rss(request: HttpRequest, podcast_id: int):
     """Serves the RSS feed.
@@ -104,10 +96,6 @@ async def podcast_feed_rss(request: HttpRequest, podcast_id: int):
     if await podcast.aneeds_updating():
         logger.debug("Going to update the PodcastFeed (%s)", podcast.id)
         update_task = refresh_podcast_feed_task(podcast=podcast)
-        update_task.add_done_callback(_cleanup_task)
-        # We have to keep a reference to the task so that it doesn't get
-        # garbage collected, in case this request gets cancelled.
-        _tasks.add(update_task)
 
         # Wait for the task. If the request gets cancelled `shield` will
         # protect it from also being cancelled, we want it to complete so that

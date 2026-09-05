@@ -5,7 +5,7 @@ from pathlib import Path
 
 from django.conf import settings
 
-from podcasts.asyncio_utils import wait_lock_or_func
+from podcasts.asyncio_utils import start_task, wait_lock_or_func
 from podcasts.models import (
     Episode,
     PodcastFeed,
@@ -16,8 +16,11 @@ from podcasts.youtube.video import download_audio
 from valkey_changes import valkey_client
 from valkey_changes.changes import changes
 
-# When refreshing a YT channel we fetch at most this many video entries initially. If we only find new entries within those, we fetch more.
-YOUTUBE_CHANNEL_REFRESH_LIMIT = 10
+# When refreshing a YT channel we fetch at most this many video entries
+# initially. If we only find new entries within those, we fetch more.
+YOUTUBE_CHANNEL_REFRESH_INITIAL_LIMIT = 30
+# I guess we need some sort of limit for extreme cases:
+YOUTUBE_CHANNEL_REFRESH_LIMIT = 5000
 
 logger = logging.getLogger(__name__)
 
@@ -40,26 +43,34 @@ _audio_download_lock = asyncio.Lock()
 _feed_download_lock = asyncio.Lock()
 
 
-def _refresh_podcast_feed_cleanup(task: asyncio.Task[None]) -> None:
-    if task.cancelled():
-        return
-    error = task.exception()
-    if error is not None:
-        logger.error("The podcast feed update task failed.", exc_info=error)
-
-
 def refresh_podcast_feed_task(podcast: PodcastFeed) -> asyncio.Task[None]:
-    update_task = asyncio.create_task(refresh_podcast_feed(podcast=podcast))
-    update_task.add_done_callback(_refresh_podcast_feed_cleanup)
-    return update_task
+    return start_task(
+        refresh_podcast_feed(podcast=podcast),
+        on_error="The podcast feed update task failed.",
+    )
 
 
 async def refresh_podcast_feed(podcast: PodcastFeed) -> None:
     async with _feed_download_lock:
         podcast = await PodcastFeed.objects.aget(pk=podcast.pk)
+        # Re-checking if it needs updating since another task might have
+        # updated it while we waited for the lock:
         if not await podcast.aneeds_updating():
             return
         await _refresh_podcast_feed(podcast=podcast)
+
+
+def refresh_podcast_feed_full_task(podcast: PodcastFeed) -> asyncio.Task[None]:
+    return start_task(
+        _refresh_podcast_feed_full(podcast=podcast),
+        on_error="The podcast feed full refresh task failed.",
+    )
+
+
+async def _refresh_podcast_feed_full(podcast: PodcastFeed) -> None:
+    async with _feed_download_lock:
+        podcast = await PodcastFeed.objects.aget(pk=podcast.pk)
+        await _fetch_and_update(podcast=podcast, entries_limit=YOUTUBE_CHANNEL_REFRESH_LIMIT)
 
 
 async def _fetch_and_update(podcast: PodcastFeed, entries_limit: int):
@@ -100,15 +111,20 @@ async def _fetch_and_update(podcast: PodcastFeed, entries_limit: int):
 
 
 async def _refresh_podcast_feed(podcast: PodcastFeed) -> None:
+    logger.debug("Refreshing PodcastFeed (%s)", podcast.id)
     found_old_ep = await _fetch_and_update(
-        podcast=podcast, entries_limit=YOUTUBE_CHANNEL_REFRESH_LIMIT
+        podcast=podcast, entries_limit=YOUTUBE_CHANNEL_REFRESH_INITIAL_LIMIT
     )
     if not found_old_ep:
         logger.debug(
-            f"Did not find an old episode within the newest {YOUTUBE_CHANNEL_REFRESH_LIMIT} entries, which means we're now fetching more, gotta catch them all."
+            f"Refreshing PodcastFeed (%s): Did not find an old episode within the newest {YOUTUBE_CHANNEL_REFRESH_INITIAL_LIMIT} entries, which means we're now fetching more, gotta catch them all.",
+            podcast.id,
         )
         # TODO: make the limit configurable on the podcast model:
-        found_old_ep = await _fetch_and_update(podcast=podcast, entries_limit=500)
+        found_old_ep = await _fetch_and_update(
+            podcast=podcast, entries_limit=YOUTUBE_CHANNEL_REFRESH_LIMIT
+        )
+    logger.debug("Done refreshing PodcastFeed (%s)", podcast.id)
 
 
 async def download_episode_media(episode: Episode) -> Episode:

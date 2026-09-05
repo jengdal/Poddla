@@ -15,6 +15,7 @@ from django.urls import reverse
 from django.utils.html import mark_safe
 from django.views.decorators.http import require_POST
 
+from podcasts.downloader import refresh_podcast_feed_full_task
 from podcasts.forms import FeedForm
 from podcasts.models import PodcastFeed
 from podcasts.youtube import fetch_feed
@@ -147,7 +148,9 @@ async def set_state(request: HttpRequest):
                 # is taking place:
                 podcast = await sync_to_async(PodcastFeed.drafts.publish)(state.podcast_id)
 
-                # TODO: Full refresh of the feed.
+                task = refresh_podcast_feed_full_task(podcast)
+                # asyncio.shield makes sure the task is not cancelled if the request is cancelled:
+                await asyncio.shield(task)
 
                 saved_podcast_id = state.podcast_id
                 state.data = {}
