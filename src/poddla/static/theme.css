@@ -16,13 +16,14 @@
     color-scheme: var(--color-scheme, light dark);
 
     /* 2. Palette source - one value to rule them all. Every other color is derived from this one. */
-    --palette-source: oklch(0.58 calc(0.21 * 1) 29);
+    --palette-source: light-dark(oklch(0.58 calc(0.21 * 1) 30),
+        oklch(0.58 calc(0.21 * 1) 29));
     --palette-hue-rotate-by: 0;
 
     /* Gray ramp - derived per-element by core/palette.css. Override --gray-chroma
        or --gray-hue here for warmer/cooler grays. */
     --gray-chroma: 0;
-    --gray-hue: 360;
+    --gray-hue: 0;
 
     /* 3. Named colors (no severity meaning) - use when you literally want a green/red/etc. dot */
     --blue: oklch(from var(--color-9) l 0.2 210);
@@ -100,11 +101,6 @@
 
     /* 13. Button */
     --button-border-radius: var(--radius-2);
-  }
-
-  .ui-dark {
-    --gray-chroma: 0.029;
-    --gray-hue: 0;
   }
 
   /* 14. Severity scope classes - re-source the palette inside these contexts. */

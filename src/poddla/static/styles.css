@@ -19,7 +19,7 @@
 
 /* === Header === */
 .app-header {
-  background-color: var(--surface-tonal);
+  background-color: light-dark(var(--color-7), var(--gray-12));
   border-block-end: 1px solid var(--border-color);
   position: sticky;
   inset-block-start: 0;

@@ -23,11 +23,11 @@
         <a href="{% url 'podcasts' %}" class="app-brand">Poddla</a>
         <nav>
           {% if user.is_authenticated %}
-          <a href="{% url 'add_channel' %}" class="ui-button ui-outlined">Add Channel</a>
-          <a href="{% url 'settings' %}" class="ui-button ui-outlined">Settings</a>
+          <a href="{% url 'add_channel' %}" class="ui-button ui-tonal">Add Channel</a>
+          <a href="{% url 'settings' %}" class="ui-button ui-tonal">Settings</a>
           <form method="post" action="{% url 'logout' %}" style="display:inline">
             {% csrf_token %}
-            <button class="ui-button ui-outlined" type="submit">Log out</button>
+            <button class="ui-button ui-tonal" type="submit">Log out</button>
           </form>
           {% endif %}
         </nav>
