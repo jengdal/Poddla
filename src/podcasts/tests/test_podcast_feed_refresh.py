@@ -154,10 +154,32 @@ class RefreshPodcastFeedTests(TransactionTestCase):
         await PodcastFeed.everything.filter(pk=podcast.pk).aupdate(
             updated_at=timezone.now() - timedelta(minutes=45)
         )
+        # An episode already matching the feed's one video means `_fetch_and_update`
+        # finds an "old" episode on its first pass, so a single refresh only calls
+        # `fetch_feed` once (no need to page for older entries) - isolating this
+        # test to the lock/dedup behavior instead of the pagination logic.
+        await Episode.objects.acreate(
+            podcast=podcast,
+            youtube_id="v1",
+            title="Video one",
+            url="https://youtube.com/watch?v=v1",
+            show_notes="",
+        )
+        feed = make_feed(
+            [
+                VideoInfo(
+                    id="v1",
+                    title="Video one",
+                    url="https://youtube.com/watch?v=v1",
+                    duration=100,
+                    timestamp=1_700_000_000,
+                )
+            ]
+        )
 
         async def slow_fetch(**kwargs):
             await asyncio.sleep(0.2)
-            return make_feed([])
+            return feed
 
         mock = AsyncMock(side_effect=slow_fetch)
 
@@ -168,3 +190,12 @@ class RefreshPodcastFeedTests(TransactionTestCase):
             )
 
         self.assertEqual(mock.await_count, 1)
+
+    async def test_an_empty_feed_does_not_trigger_pagination_for_more(self):
+        podcast = await self.make_podcast()
+        mock = AsyncMock(return_value=make_feed([]))
+
+        with patch("podcasts.downloader.fetch_feed", mock):
+            await _refresh_podcast_feed(podcast=podcast)
+
+        mock.assert_awaited_once()

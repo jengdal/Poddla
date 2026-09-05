@@ -59,7 +59,7 @@ class PodcastFeedRssTests(TestCase):
 
     def test_fetching_a_stale_feed_triggers_a_refresh(self):
         mock_refresh = AsyncMock()
-        with patch("podcasts.feeds.refresh_podcast_feed", mock_refresh):
+        with patch("podcasts.feeds.refresh_podcast_feed_task", mock_refresh):
             response = self.client.get(self.url, headers=self.auth_headers)
 
         self.assertEqual(response.status_code, 200)
@@ -68,23 +68,21 @@ class PodcastFeedRssTests(TestCase):
     def test_a_fresh_feed_is_not_refreshed_again(self):
         PodcastFeed.everything.filter(pk=self.podcast.pk).update(updated_at=timezone.now())
         mock_refresh = AsyncMock()
-        with patch("podcasts.feeds.refresh_podcast_feed", mock_refresh):
+        with patch("podcasts.feeds.refresh_podcast_feed_task", mock_refresh):
             response = self.client.get(self.url, headers=self.auth_headers)
 
         self.assertEqual(response.status_code, 200)
         mock_refresh.assert_not_awaited()
 
-    def test_a_failed_refresh_still_serves_the_existing_feed(self):
+    def test_a_failed_refresh_propagates(self):
         mock_refresh = AsyncMock(side_effect=RuntimeError("boom"))
-        with patch("podcasts.feeds.refresh_podcast_feed", mock_refresh):
-            response = self.client.get(self.url, headers=self.auth_headers)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(self.episode.title.encode(), response.content)
+        with patch("podcasts.feeds.refresh_podcast_feed_task", mock_refresh):
+            with self.assertRaises(RuntimeError):
+                self.client.get(self.url, headers=self.auth_headers)
 
     def test_feed_is_psp1_compliant(self):
         mock_refresh = AsyncMock()
-        with patch("podcasts.feeds.refresh_podcast_feed", mock_refresh):
+        with patch("podcasts.feeds.refresh_podcast_feed_task", mock_refresh):
             response = self.client.get(self.url, headers=self.auth_headers)
 
         content = response.content.decode()
@@ -99,7 +97,7 @@ class PodcastFeedRssTests(TestCase):
 
     def test_enclosure_url_includes_the_users_basic_auth_credentials(self):
         mock_refresh = AsyncMock()
-        with patch("podcasts.feeds.refresh_podcast_feed", mock_refresh):
+        with patch("podcasts.feeds.refresh_podcast_feed_task", mock_refresh):
             response = self.client.get(self.url, headers=self.auth_headers)
 
         content = response.content.decode()
@@ -115,7 +113,7 @@ class PodcastFeedRssTests(TestCase):
         self.episode.save()
 
         mock_refresh = AsyncMock()
-        with patch("podcasts.feeds.refresh_podcast_feed", mock_refresh):
+        with patch("podcasts.feeds.refresh_podcast_feed_task", mock_refresh):
             response = self.client.get(self.url, headers=self.auth_headers)
 
         self.assertIn('length="1234"', response.content.decode())
@@ -125,7 +123,7 @@ class PodcastFeedRssTests(TestCase):
         self.episode.save()
 
         mock_refresh = AsyncMock()
-        with patch("podcasts.feeds.refresh_podcast_feed", mock_refresh):
+        with patch("podcasts.feeds.refresh_podcast_feed_task", mock_refresh):
             response = self.client.get(self.url, headers=self.auth_headers)
 
         content = response.content.decode()
