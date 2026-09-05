@@ -76,7 +76,10 @@ async def fetch_feed(
         cache_seconds,
     )
 
-    title = info.get("title", "")
+    if info.get("channel", None):
+        title = str(info.get("channel"))
+    else:
+        title = info.get("title", "")
     entries = list(info.get("entries") or [])
 
     # The root of a channel URL returns playlist entries, we have to use the Video tab:
