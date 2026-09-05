@@ -163,7 +163,7 @@ async def _download_and_release(episode: Episode) -> Episode:
 
 async def _download_and_update(episode: Episode) -> Episode:
     media_root = Path(settings.MEDIA_ROOT)
-    rel_path = Path(str(episode.podcast_id)) / str(episode.id)
+    rel_path = Path("audio") / Path(str(episode.podcast_id)) / str(episode.id)
     download_info = await asyncio.to_thread(download_audio, episode.url, media_root, rel_path)
     episode.file_path = str(download_info.file_path.relative_to(media_root))
     episode.published_at = download_info.published_at
