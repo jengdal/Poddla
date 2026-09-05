@@ -1,11 +1,11 @@
 {% load podcast_filters %}
 {% load user_settings_tags %}
-<div class="podcast-feed-layout">
+<div id="podcast-feed-layout" class="podcast-feed-layout">
 
   <div class="podcast-feed-header">
     <a href="{{ podcast.url }}" target="_blank" rel="noopener">
       {% if podcast.thumbnail %}
-        <img src="{{ podcast.thumbnail }}" alt="{{ podcast.name }}" class="podcast-feed-thumbnail" referrerpolicy="no-referrer" />
+        <img id="podcast-thumbnail" src="{{ podcast.thumbnail }}" alt="{{ podcast.name }}" class="podcast-feed-thumbnail" referrerpolicy="no-referrer" />
       {% else %}
         <div class="podcast-feed-thumbnail-placeholder"></div>
       {% endif %}
