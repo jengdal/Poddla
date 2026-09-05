@@ -1,3 +1,4 @@
+@import "./theme.css";
 @view-transition {
   navigation: auto;
 }
@@ -16,21 +17,9 @@
   to   { opacity: 1; }
 }
 
-/* === Theme: YouTube Red === */
-@layer theme {
-  :where(html) {
-    --palette-hue: 25;       /* YouTube red */
-    --palette-chroma: 0.65;
-    --gray-hue: 250;         /* cool-tinted neutrals */
-    --gray-chroma: 0.008;
-    --border-radius: var(--size-2);
-    --button-border-radius: var(--radius-round);
-  }
-}
-
 /* === Header === */
 .app-header {
-  background-color: var(--surface-2);
+  background-color: var(--surface-tonal);
   border-block-end: 1px solid var(--border-color);
   position: sticky;
   inset-block-start: 0;
@@ -53,7 +42,7 @@
   font-weight: var(--font-weight-7);
   letter-spacing: -0.02em;
   text-decoration: none;
-  color: var(--text-1);
+  color: var(--text-primary);
 }
 
 .app-brand:hover {
@@ -84,7 +73,7 @@
 .podcast-card-thumbnail-placeholder {
   width: 100%;
   aspect-ratio: 1;
-  background-color: var(--surface-3);
+  background-color: var(--surface-filled);
 }
 
 .podcast-card-body {
@@ -138,7 +127,7 @@ a.ui-card:hover {
 }
 
 .podcast-feed-thumbnail-placeholder {
-  background-color: var(--surface-3);
+  background-color: var(--surface-filled);
 }
 
 .podcast-feed-meta {
@@ -211,8 +200,8 @@ a.ui-card:hover {
   margin: auto;
   inline-size: 2rem;
   block-size: 2rem;
-  border: 3px solid var(--surface-3);
-  border-block-start-color: var(--text-1);
+  border: 3px solid var(--surface-filled);
+  border-block-start-color: var(--text-primary);
   border-radius: 50%;
   animation: add-channel-spin 0.7s linear infinite;
 }
@@ -295,8 +284,8 @@ a.ui-card:hover {
   margin: auto;
   inline-size: 2rem;
   block-size: 2rem;
-  border: 3px solid var(--surface-3);
-  border-block-start-color: var(--text-1);
+  border: 3px solid var(--surface-filled);
+  border-block-start-color: var(--text-primary);
   border-radius: 50%;
   animation: add-channel-spin 0.7s linear infinite;
 }
