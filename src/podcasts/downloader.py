@@ -90,18 +90,20 @@ async def _fetch_and_update(podcast: PodcastFeed, entries_limit: int):
 
     for v in feed.videos:
         published_at = datetime.fromtimestamp(v.timestamp, tz=timezone.utc) if v.timestamp else None
+        thumbnail = v.thumbnail or ""
+
         _, created = await Episode.objects.aupdate_or_create(
             podcast=podcast,
             url=v.url,
-            defaults={"title": v.title},
+            defaults={"title": v.title, "thumbnail": thumbnail},
             create_defaults={
                 "title": v.title,
                 "youtube_id": v.id,
+                "thumbnail": thumbnail,
                 # These are not very accurate when gotten from the channel or playlist. When we
                 # download media, we also get more accurate data for these and update them at
                 # that point, so don't overwrite potentially better data here:
                 "duration": v.duration,
-                "thumbnail": v.thumbnail or "",
                 "published_at": published_at,
             },
         )
