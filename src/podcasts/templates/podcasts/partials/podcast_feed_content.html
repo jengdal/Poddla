@@ -15,20 +15,45 @@
       {% if podcast.description %}
         <p class="ui-description">{{ podcast.description }}</p>
       {% endif %}
+      {% if not preview %}
+        {% with count=episodes|length %}
+          {% if count %}
+            <span class="ui-caption">{{ count }} episode{{ count|pluralize }}</span>
+          {% endif %}
+        {% endwith %}
+        {% authed_feed_url 'podcast_feed_rss' state.podcast_id as feed_url %}
+        <div class="podcast-subscribe-links">
+          <a href="podcast://{{ feed_url|strip_scheme }}" class="ui-button ui-primary ui-tonal">Apple Podcasts</a>
+          <a href="overcast://x-callback-url/add?url={{ feed_url|urlencode }}" class="ui-button ui-primary ui-tonal">Overcast</a>
+          <a href="castro://subscribe/{{ feed_url|strip_scheme }}" class="ui-button ui-primary ui-tonal">Castro</a>
+          <a href="pktc://subscribe/{{ feed_url|strip_scheme }}" class="ui-button ui-primary ui-tonal">Pocket Casts</a>
+          <a href="{{ feed_url }}" class="ui-button ui-primary ui-filled">RSS</a>
+          <button type="button" class="ui-button ui-primary ui-filled" onclick="navigator.clipboard.writeText('{{ feed_url|escapejs }}'); this.textContent='Copied!';" title="Copy the RSS URL. Then paste it into your podcast player.">Copy RSS URL</button>
+        </div>
+        <article role="note" class="ui-callout">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="32"
+            height="32"
+            viewBox="0 0 32 32"
+          >
+            <path
+              fill="currentColor"
+              d="M16 13a1 1 0 0 1 1 1v9a1 1 0 1 1-2 0v-9a1 1 0 0 1 1-1m0-2a1.5 1.5 0 1 0 0-3a1.5 1.5 0 0 0 0 3M2 16C2 8.268 8.268 2 16 2s14 6.268 14 14s-6.268 14-14 14S2 23.732 2 16M16 4C9.373 4 4 9.373 4 16s5.373 12 12 12s12-5.373 12-12S22.627 4 16 4"
+            ></path>
+          </svg>
+            {# TODO: Link the documentation. #}
+          <div class="ui-content">The podcast RSS URL is personal to you. Read more about it in the documentation.</div>
+        </article>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if episodes %}
+    {% if preview %}
       {% with count=episodes|length %}
-        {% if count %}
-          <span class="ui-caption">{{ count }} episode{{ count|pluralize }}</span>
-        {% endif %}
-      {% endwith %}
-      {% authed_feed_url 'podcast_feed_rss' state.podcast_id as feed_url %}
-      <div class="podcast-subscribe-links">
-        <a href="podcast://{{ feed_url|strip_scheme }}" class="ui-button ui-primary ui-tonal">Apple Podcasts</a>
-        <a href="overcast://x-callback-url/add?url={{ feed_url|urlencode }}" class="ui-button ui-primary ui-tonal">Overcast</a>
-        <a href="castro://subscribe/{{ feed_url|strip_scheme }}" class="ui-button ui-primary ui-tonal">Castro</a>
-        <a href="pktc://subscribe/{{ feed_url|strip_scheme }}" class="ui-button ui-primary ui-tonal">Pocket Casts</a>
-        <a href="{{ feed_url }}" class="ui-button ui-primary ui-filled">RSS</a>
-        <button type="button" class="ui-button ui-primary ui-filled" onclick="navigator.clipboard.writeText('{{ feed_url|escapejs }}'); this.textContent='Copied!';" title="Copy the RSS URL. Then paste it into your podcast player.">Copy RSS URL</button>
-      </div>
+      {# The below notice is only useful if we believe there are more than 10 videos on the channel #}
+      {% if count is 10 %}
       <article role="note" class="ui-callout">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -41,13 +66,14 @@
             d="M16 13a1 1 0 0 1 1 1v9a1 1 0 1 1-2 0v-9a1 1 0 0 1 1-1m0-2a1.5 1.5 0 1 0 0-3a1.5 1.5 0 0 0 0 3M2 16C2 8.268 8.268 2 16 2s14 6.268 14 14s-6.268 14-14 14S2 23.732 2 16M16 4C9.373 4 4 9.373 4 16s5.373 12 12 12s12-5.373 12-12S22.627 4 16 4"
           ></path>
         </svg>
-          {# TODO: Link the documentation. #}
-        <div class="ui-content">The podcast RSS URL is personal to you. Read more about it in the documentation.</div>
+        <div class="ui-content">These are the 10 latest episodes we found. Poddla will look for more episodes when you press the create button
+        </div>
       </article>
-    </div>
-  </div>
+      {% endif %}
+      {% endwith %}
 
-  {% if episodes %}
+    {% endif %}
+
     <ul class="ui-list" style="--_bg-color: transparent">
       {% for episode in episodes %}
       <li class="ui-item">

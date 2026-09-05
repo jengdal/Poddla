@@ -140,7 +140,7 @@ a.ui-card:hover {
 .podcast-feed-thumbnail,
 .podcast-feed-thumbnail-placeholder {
   width: 160px;
-  height: 160px;
+  aspect-ratio: 1;
   object-fit: cover;
   border-radius: var(--radius-3);
   flex-shrink: 0;

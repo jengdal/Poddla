@@ -63,7 +63,7 @@
     {% if channel %}
       {% if channel.episodes.all %}
       <div id="feed-preview">
-        {% include "podcasts/partials/podcast_feed_content.html" with podcast=channel episodes=channel.episodes.all %}
+        {% include "podcasts/partials/podcast_feed_content.html" with podcast=channel episodes=channel.episodes.all preview=True %}
       </div>
       {% elif channel.name %}
       <div id="feed-preview" class="ui-callout">

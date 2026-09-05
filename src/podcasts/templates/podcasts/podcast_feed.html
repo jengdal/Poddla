@@ -6,6 +6,6 @@
 {% block content %}
 
 <div id="podcast-feed-container" data-signals:tab_id="'{{ state.tab_id }}'" data-init="@get('{% url 'podcast_feed_sse' state.podcast_id %}')">
-  {% include "podcasts/partials/podcast_feed_content.html" %}
+  {% include "podcasts/partials/podcast_feed_content.html" with preview=False %}
 </div>
 {% endblock content %}
