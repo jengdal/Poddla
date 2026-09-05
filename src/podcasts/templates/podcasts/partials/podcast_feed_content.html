@@ -20,7 +20,29 @@
           <span class="ui-caption">{{ count }} episode{{ count|pluralize }}</span>
         {% endif %}
       {% endwith %}
-      <a href="{% authed_feed_url 'podcast_feed_rss' state.podcast_id %}" class="ui-button ui-outlined">RSS Feed</a>
+      {% authed_feed_url 'podcast_feed_rss' state.podcast_id as feed_url %}
+      <div class="podcast-subscribe-links">
+        <a href="podcast://{{ feed_url|strip_scheme }}" class="ui-button ui-outlined">Apple Podcasts</a>
+        <a href="overcast://x-callback-url/add?url={{ feed_url|urlencode }}" class="ui-button ui-outlined">Overcast</a>
+        <a href="castro://subscribe/{{ feed_url|strip_scheme }}" class="ui-button ui-outlined">Castro</a>
+        <a href="pktc://subscribe/{{ feed_url|strip_scheme }}" class="ui-button ui-outlined">Pocket Casts</a>
+        <a href="{{ feed_url }}" class="ui-button ui-outlined">RSS Feed</a>
+        <button type="button" class="ui-button ui-outlined" onclick="navigator.clipboard.writeText('{{ feed_url|escapejs }}'); this.textContent='Copied!';">Copy RSS URL</button>
+      </div>
+      <article role="note" class="ui-callout ui-info">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+        >
+          <path
+            fill="currentColor"
+            d="M16 13a1 1 0 0 1 1 1v9a1 1 0 1 1-2 0v-9a1 1 0 0 1 1-1m0-2a1.5 1.5 0 1 0 0-3a1.5 1.5 0 0 0 0 3M2 16C2 8.268 8.268 2 16 2s14 6.268 14 14s-6.268 14-14 14S2 23.732 2 16M16 4C9.373 4 4 9.373 4 16s5.373 12 12 12s12-5.373 12-12S22.627 4 16 4"
+          ></path>
+        </svg>
+        <div class="ui-content">The links are personal to you and are not easily guessable. They use HTTP Basic Auth to achieve this. Read more about this in the readme.</div>
+      </article>
     </div>
   </div>
 

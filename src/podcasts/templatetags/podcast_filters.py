@@ -22,3 +22,8 @@ def format_timestamp(ts):
     if ts is None:
         return ""
     return datetime.fromtimestamp(int(ts), tz=timezone.utc).strftime("%-d %b %Y")
+
+
+@register.filter
+def strip_scheme(url):
+    return url.partition("://")[2]

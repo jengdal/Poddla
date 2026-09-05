@@ -139,6 +139,12 @@ a.ui-card:hover {
   letter-spacing: -0.02em;
 }
 
+.podcast-subscribe-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-2);
+}
+
 
 /* === Add-channel layout === */
 .add-channel-layout {
