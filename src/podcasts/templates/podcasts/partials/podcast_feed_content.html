@@ -3,13 +3,15 @@
 <div class="podcast-feed-layout">
 
   <div class="podcast-feed-header">
-    {% if podcast.thumbnail %}
-      <img src="{{ podcast.thumbnail }}" alt="{{ podcast.name }}" class="podcast-feed-thumbnail" referrerpolicy="no-referrer" />
-    {% else %}
-      <div class="podcast-feed-thumbnail-placeholder"></div>
-    {% endif %}
+    <a href="{{ podcast.url }}" target="_blank" rel="noopener">
+      {% if podcast.thumbnail %}
+        <img src="{{ podcast.thumbnail }}" alt="{{ podcast.name }}" class="podcast-feed-thumbnail" referrerpolicy="no-referrer" />
+      {% else %}
+        <div class="podcast-feed-thumbnail-placeholder"></div>
+      {% endif %}
+    </a>
     <div class="podcast-feed-meta">
-      <h2 class="ui-h4">{{ podcast.name }}</h2>
+      <h2 class="ui-h4"><a href="{{ podcast.url }}" target="_blank" rel="noopener" class="ui-link">{{ podcast.name }}</a></h2>
       {% if podcast.description %}
         <p class="ui-description">{{ podcast.description }}</p>
       {% endif %}
@@ -26,17 +28,19 @@
     <ul class="ui-list" style="--_bg-color: transparent">
       {% for episode in episodes %}
       <li class="ui-item">
+        <a href="{{ episode.url }}" target="_blank" rel="noopener" class="ui-link">
         {% if episode.thumbnail %}
           <img src="{{ episode.thumbnail }}" alt="{{ episode.title }}" referrerpolicy="no-referrer"
                style="width:80px;height:48px;object-fit:cover;border-radius:var(--radius-1);flex-shrink:0">
         {% endif %}
         <div class="ui-content">
-          <a href="{{ episode.url }}" target="_blank" rel="noopener" class="ui-link">{{ episode.title }}</a>
+          <span class="ui-title">{{ episode.title }}</span>
           <div style="display:flex;gap:var(--size-3)">
             {% if episode.duration %}<span class="ui-caption">{{ episode.duration|format_duration }}</span>{% endif %}
             {% if episode.published_at %}<span class="ui-caption">{{ episode.published_at|date:"j M Y" }}</span>{% endif %}
           </div>
         </div>
+        </a>
       </li>
       {% endfor %}
     </ul>
