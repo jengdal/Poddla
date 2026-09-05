@@ -50,7 +50,13 @@ max-doc-length = 100
 
 [tool.uv.build-backend]
 # Add every top-level package under src/ here:
-module-name = ["poddla", "podcasts", "valkey_changes", "user_settings"]
+module-name = [
+  "poddla",
+  "podcasts",
+  "valkey_changes",
+  "user_settings",
+  "poddla_settings",
+]
 
 [tool.coverage.run]
 branch = true
