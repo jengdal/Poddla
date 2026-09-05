@@ -17,13 +17,33 @@
   to   { opacity: 1; }
 }
 
+body {
+font-family: var(--font-geometric-humanist);
+}
+
 /* === Header === */
 .app-header {
-  background-color: light-dark(var(--color-7), var(--gray-12));
-  border-block-end: 1px solid var(--border-color);
   position: sticky;
   inset-block-start: 0;
   z-index: 100;
+  background-color: color-mix(in oklch, var(--surface-default) 80%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.app-header::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: 1px;
+  background: linear-gradient(to right, transparent, var(--primary), transparent);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .app-header {
+    background-color: var(--surface-default);
+  }
 }
 
 .app-header-inner {
@@ -38,9 +58,10 @@
 }
 
 .app-brand {
+  /* font-family: var(--font-mono); */
   font-size: var(--font-size-3);
   font-weight: var(--font-weight-7);
-  letter-spacing: -0.02em;
+  /* letter-spacing: -0.03em; */
   text-decoration: none;
   color: var(--text-primary);
 }
