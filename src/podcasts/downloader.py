@@ -109,23 +109,21 @@ async def _fetch_and_update(podcast: PodcastFeed, entries_limit: int):
         )
         if not created:
             found_old_ep = True
-    return found_old_ep
+    return found_old_ep, len(feed.videos)
 
 
 async def _refresh_podcast_feed(podcast: PodcastFeed) -> None:
     logger.debug("Refreshing PodcastFeed (%s)", podcast.id)
-    found_old_ep = await _fetch_and_update(
+    found_old_ep, found_count = await _fetch_and_update(
         podcast=podcast, entries_limit=YOUTUBE_CHANNEL_REFRESH_INITIAL_LIMIT
     )
-    if not found_old_ep:
+    if found_count and not found_old_ep:
         logger.debug(
             f"Refreshing PodcastFeed (%s): Did not find an old episode within the newest {YOUTUBE_CHANNEL_REFRESH_INITIAL_LIMIT} entries, which means we're now fetching more, gotta catch them all.",
             podcast.id,
         )
         # TODO: make the limit configurable on the podcast model:
-        found_old_ep = await _fetch_and_update(
-            podcast=podcast, entries_limit=YOUTUBE_CHANNEL_REFRESH_LIMIT
-        )
+        await _fetch_and_update(podcast=podcast, entries_limit=YOUTUBE_CHANNEL_REFRESH_LIMIT)
     logger.debug("Done refreshing PodcastFeed (%s)", podcast.id)
 
 
