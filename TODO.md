@@ -7,5 +7,3 @@
       an example for future projects. https://http1mustdie.com
 - [ ] Include chapter markers based on YT data, and/or use a local LLM to figure them out based on
       the audio.
-- [ ] When refreshing a feed, do not fetch _all_ episodes every time. Most of the time it's enough
-      to just check if there are new ones.
