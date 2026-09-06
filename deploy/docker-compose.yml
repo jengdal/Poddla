@@ -39,12 +39,10 @@ services:
   caddy:
     image: caddy:2.11.4
     ports:
-      - "8080:8080"
-      # - "443:443"
-      # - "443:443/udp"
+      - "443:443"
     environment:
       # See the Caddyfile:
-      SITE_ADDRESS: http://poddla:8080
+      SITE_ADDRESS: https://poddla.example.com:8080
       # TRUSTED_PROXIES: 192.168.1.1/32
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

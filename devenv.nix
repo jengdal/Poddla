@@ -86,12 +86,18 @@ in
         source .env
         set +a
       fi
-      uv run uvicorn --port 8000 --host 0.0.0.0 --timeout-graceful-shutdown 0 \
-              --reload --reload-dir src \
-              --reload-include '**/*.html' \
-              --reload-include '**/*.css' \
-              --reload-include '**/*.js' \
-              poddla.asgi:application
+      uv run granian \
+        --process-name poddla \
+        --http auto \
+        --interface asgi \
+        --port 8000 \
+        --host 127.0.0.1 \
+        --workers 1 \
+        --no-ws \
+        --workers-kill-timeout 1 \
+        --reload \
+        --reload-paths ./src/ \
+        poddla.asgi:application
     '';
   };
 

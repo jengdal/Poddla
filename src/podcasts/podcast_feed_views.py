@@ -154,7 +154,11 @@ async def episode_media(request: HttpRequest, episode_id: int):
         logger.error("The Episode (%s) file was not downloaded.", episode.id)
         return HttpResponse(status=500)
 
-    # TODO: Use nginx or caddy to serve the file instead:
+    # Granian supports ASGI `pathsend`, which would let us hand off the file
+    # path to it, and have it serve the file to the client. The problem is that
+    # `pathsend` doesn't support `Range` requests, which would mean streaming
+    # audio to podcast clients wouldn't work.
+    # Instead, we serve the file ourselves from python.
     return _serve_with_range(request, episode_file)
 
 

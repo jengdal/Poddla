@@ -60,9 +60,13 @@ let
         set -euo pipefail
         "${app}/bin/django-admin" migrate --noinput
         "${app}/bin/django-admin" create_initial_admin
-        exec "${app}/bin/uvicorn" --port 8000 --host 0.0.0.0 \
-                --timeout-graceful-shutdown 0 \
-                poddla.asgi:application
+        exec "${app}/bin/granian" \
+          --interface asgi \
+          --workers 1 \
+          --no-ws \
+          --workers-kill-timeout 1 \
+          --no-reload \
+          poddla.asgi:application
       '';
     in
     {
@@ -105,6 +109,12 @@ let
             "DJANGO_SETTINGS_MODULE=poddla.settings"
             # STATIC_ROOT: You do not want to change this in your deploy. It points to a nix store path.
             "STATIC_ROOT=${collectedStatic}"
+            # Granian will serve the static files:
+            "GRANIAN_STATIC_PATH_MOUNT=${collectedStatic}"
+            "GRANIAN_STATIC_PATH_ROUTE=/static"
+            "GRANIAN_HOST=0.0.0.0"
+            "GRANIAN_PORT=8080"
+            "GRANIAN_HTTP=2"
           ];
         };
       };
