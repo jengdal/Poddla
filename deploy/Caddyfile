@@ -10,12 +10,5 @@
 # - http://poddla.example.com:8080 if you only want http on port 8080.
 # - https://poddla.example.com for https.
 {$SITE_ADDRESS} {
-	handle_path /static/* {
-		root * /srv/static
-		file_server
-	}
-
-	handle {
-		reverse_proxy poddla:8000
-	}
+	reverse_proxy poddla:8000
 }

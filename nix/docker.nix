@@ -84,18 +84,13 @@ let
           pkgsLinux.dockerTools.caCertificates
         ];
 
-        # 1. We need a writeable `$HOME/.cache/` for yt-dlp and deno, we use /tmp for home and make it writeable.
-        # 2. /staticfiles is where Caddy (from the compose file) expects to find static files, via a shared
-        #    docker volume. We put a real copy of collectedStatic there - a symlink into the nix store
-        #    wouldn't be reachable from other images.
+        # We need a writeable `$HOME/.cache/` for yt-dlp and deno, we use /tmp for home and make it writeable.
         fakeRootCommands = ''
           mkdir -p tmp
           chmod 1777 tmp
 
           # WorkingDir below, otherwise never created on disk.
           mkdir -p app
-
-          cp -r --dereference ${collectedStatic} staticfiles
         '';
 
         config = {
@@ -108,6 +103,8 @@ let
             "HOME=/tmp"
             "BGUTIL_SERVER_HOME=${bgutil-server-linux}"
             "DJANGO_SETTINGS_MODULE=poddla.settings"
+            # STATIC_ROOT: You do not want to change this in your deploy. It points to a nix store path.
+            "STATIC_ROOT=${collectedStatic}"
           ];
         };
       };

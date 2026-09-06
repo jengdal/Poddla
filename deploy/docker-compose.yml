@@ -24,8 +24,6 @@ services:
       - ./data/db:/data/db
       # The downloaded audio will be stored here:
       - ./data/media:/data/media
-      # Put poddla's static files (css, js, etc) on a named valume so that Caddy can mount and serve them, see below:
-      - poddla_static:/staticfiles
     depends_on:
       - valkey
     restart: unless-stopped
@@ -50,7 +48,6 @@ services:
       # TRUSTED_PROXIES: 192.168.1.1/32
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - poddla_static:/srv/static:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -58,7 +55,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  poddla_static:
   valkey_data:
   caddy_data:
   caddy_config:
