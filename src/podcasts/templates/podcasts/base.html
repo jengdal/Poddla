@@ -26,6 +26,7 @@
           <a href="{% url 'podcasts' %}" class="ui-button ui-small ui-tonal">Podcasts</a>
           <a href="{% url 'add_channel' %}" class="ui-button ui-small ui-tonal">Create Podcast</a>
           <a href="{% url 'settings' %}" class="ui-button ui-small ui-tonal">Settings</a>
+          <a href="{% url 'password_change' %}" class="ui-button ui-small ui-tonal">Change password</a>
           <form method="post" action="{% url 'logout' %}" style="display:inline">
             {% csrf_token %}
             <button class="ui-button ui-small ui-tonal" type="submit">Log out</button>
