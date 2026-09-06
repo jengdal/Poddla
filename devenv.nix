@@ -123,6 +123,18 @@ in
     '';
   };
 
+  # This builds the docker image and loads it into your docker. Use it with: `poddla:latest`.
+  scripts.docker-build-load = {
+    exec = ''
+      set -euo pipefail
+
+      output="poddla-image-$(uname -m)"
+      echo "Building $output..."
+      store_path=$(devenv build "outputs.$output" | jq -r ".\"outputs.$output\"")
+      docker load < "$store_path"
+    '';
+  };
+
   # Build both arch images (see `docker.nix`) and publish them to the registry as one
   # multi-arch tag. Usage: `devenv shell docker-publish [tag]` (defaults to `latest`).
   # Reads DOCKER_REGISTRY_IMAGE from .env (see .env.example). Assumes you've already
