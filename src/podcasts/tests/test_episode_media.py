@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import tempfile
 import threading
 import time
@@ -8,6 +7,7 @@ from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
+from django.http import Http404
 from django.test import AsyncRequestFactory, TransactionTestCase, override_settings
 
 from podcasts.downloader import _audio_download_lock
@@ -16,11 +16,6 @@ from podcasts.podcast_feed_views import episode_media
 from podcasts.youtube.video import DownloadInfo
 from valkey_changes import valkey_client
 from valkey_changes.changes import changes
-
-
-def _basic_auth_headers(username: str, password: str) -> dict:
-    token = base64.b64encode(f"{username}:{password}".encode()).decode()
-    return {"Authorization": f"Basic {token}"}
 
 
 def make_download(
@@ -79,11 +74,10 @@ class EpisodeMediaTests(TransactionTestCase):
             url="https://youtube.com/watch?v=abc123",
             show_notes="",
         )
-        self.user = User.objects.create_user(username="listener", password="not-the-basic-auth-one")
+        self.user = User.objects.create_user(username="listener", password="a-real-password")
         self.user_settings = self.user.user_settings
-        self.user_settings.basic_auth_password = "test-password"
+        self.user_settings.feed_token = "test-token"
         self.user_settings.save()
-        self.auth_headers = _basic_auth_headers("listener", "test-password")
         self.factory = AsyncRequestFactory()
         async_to_sync(_flush_valkey)()
 
@@ -94,21 +88,19 @@ class EpisodeMediaTests(TransactionTestCase):
         if _audio_download_lock.locked():
             _audio_download_lock.release()
 
-    async def test_requires_basic_auth(self):
-        req = self.factory.get(f"/e/{self.episode.pk}/media/")
+    async def test_requires_a_valid_feed_token(self):
+        req = self.factory.get(f"/f/wrong-token/e/{self.episode.pk}/media/")
 
-        response = await episode_media(req, self.episode.pk)
-
-        self.assertEqual(response.status_code, 401)
-        self.assertTrue(response["WWW-Authenticate"].startswith("Basic"))
+        with self.assertRaises(Http404):
+            await episode_media(req, "wrong-token", self.episode.pk)
 
     async def test_single_request_downloads_and_serves(self):
-        req = self.factory.get(f"/e/{self.episode.pk}/media/", headers=self.auth_headers)
+        req = self.factory.get(f"/f/{self.user_settings.feed_token}/e/{self.episode.pk}/media/")
         with (
             patch("podcasts.downloader.download_audio", make_download()),
             override_settings(MEDIA_ROOT=str(self.media_root)),
         ):
-            response = await episode_media(req, self.episode.pk)
+            response = await episode_media(req, self.user_settings.feed_token, self.episode.pk)
 
         self.assertIn(response.status_code, (200, 206))
         await self.episode.arefresh_from_db()
@@ -121,19 +113,19 @@ class EpisodeMediaTests(TransactionTestCase):
         self.episode.file_path = str(path.relative_to(self.media_root))
         await self.episode.asave(update_fields=["file_path"])
 
-        req = self.factory.get(f"/e/{self.episode.pk}/media/", headers=self.auth_headers)
+        req = self.factory.get(f"/f/{self.user_settings.feed_token}/e/{self.episode.pk}/media/")
         counter: dict = {"n": 0}
         with (
             patch("podcasts.downloader.download_audio", make_download(call_counter=counter)),
             override_settings(MEDIA_ROOT=str(self.media_root)),
         ):
-            response = await episode_media(req, self.episode.pk)
+            response = await episode_media(req, self.user_settings.feed_token, self.episode.pk)
 
         self.assertEqual(counter["n"], 0)
         self.assertIn(response.status_code, (200, 206))
 
     async def test_concurrent_requests_download_once(self):
-        req = self.factory.get(f"/e/{self.episode.pk}/media/", headers=self.auth_headers)
+        req = self.factory.get(f"/f/{self.user_settings.feed_token}/e/{self.episode.pk}/media/")
         counter: dict = {"n": 0}
         with (
             patch(
@@ -143,9 +135,9 @@ class EpisodeMediaTests(TransactionTestCase):
             override_settings(MEDIA_ROOT=str(self.media_root)),
         ):
             r1, r2, r3 = await asyncio.gather(
-                episode_media(req, self.episode.pk),
-                episode_media(req, self.episode.pk),
-                episode_media(req, self.episode.pk),
+                episode_media(req, self.user_settings.feed_token, self.episode.pk),
+                episode_media(req, self.user_settings.feed_token, self.episode.pk),
+                episode_media(req, self.user_settings.feed_token, self.episode.pk),
             )
 
         self.assertEqual(counter["n"], 1)
@@ -158,7 +150,7 @@ class EpisodeMediaTests(TransactionTestCase):
     async def test_failed_download_releases_the_lock_for_the_next_request(self):
         # Regression test: a download that raises used to leak _audio_download_lock forever,
         # wedging every later request for any episode.
-        req = self.factory.get(f"/e/{self.episode.pk}/media/", headers=self.auth_headers)
+        req = self.factory.get(f"/f/{self.user_settings.feed_token}/e/{self.episode.pk}/media/")
         with (
             patch(
                 "podcasts.downloader.download_audio",
@@ -167,11 +159,11 @@ class EpisodeMediaTests(TransactionTestCase):
             override_settings(MEDIA_ROOT=str(self.media_root)),
         ):
             with self.assertRaises(RuntimeError):
-                await episode_media(req, self.episode.pk)
+                await episode_media(req, self.user_settings.feed_token, self.episode.pk)
 
             self.assertFalse(_audio_download_lock.locked())
 
-            response = await episode_media(req, self.episode.pk)
+            response = await episode_media(req, self.user_settings.feed_token, self.episode.pk)
 
         self.assertIn(response.status_code, (200, 206))
         await self.episode.arefresh_from_db()
@@ -184,7 +176,7 @@ class EpisodeMediaTests(TransactionTestCase):
         # the underlying thread on cancellation, so without shielding, the DB update that
         # records the finished download never happens - and the *next* request starts a
         # brand new download, unaware a copy is still running unseen in the background.
-        req = self.factory.get(f"/e/{self.episode.pk}/media/", headers=self.auth_headers)
+        req = self.factory.get(f"/f/{self.user_settings.feed_token}/e/{self.episode.pk}/media/")
         counter: dict = {"n": 0}
         started = threading.Event()
         episode_updates = episode_publisher.subscribe(pk=self.episode.pk)
@@ -196,7 +188,7 @@ class EpisodeMediaTests(TransactionTestCase):
                 ),
                 override_settings(MEDIA_ROOT=str(self.media_root)),
             ):
-                task = asyncio.create_task(episode_media(req, self.episode.pk))
+                task = asyncio.create_task(episode_media(req, self.user_settings.feed_token, self.episode.pk))
                 await asyncio.to_thread(started.wait, 2)
                 task.cancel()
                 with self.assertRaises(asyncio.CancelledError):
@@ -222,7 +214,7 @@ class EpisodeMediaTests(TransactionTestCase):
                 self.assertIsNotNone(self.episode.file_path)
 
                 # A fresh request must find the file already there, not download it again:
-                response = await episode_media(req, self.episode.pk)
+                response = await episode_media(req, self.user_settings.feed_token, self.episode.pk)
 
         self.assertEqual(counter["n"], 1)
         self.assertIn(response.status_code, (200, 206))

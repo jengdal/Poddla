@@ -16,12 +16,12 @@ urlpatterns = [
         name="podcast_feed_sse",
     ),
     path(
-        "p/<int:podcast_id>/rss/",
+        "f/<str:feed_token>/p/<int:podcast_id>/rss/",
         feeds.podcast_feed_rss,
         name="podcast_feed_rss",
     ),
     path(
-        "e/<int:episode_id>/media/",
+        "f/<str:feed_token>/e/<int:episode_id>/media/",
         podcast_feed_views.episode_media,
         name="podcast_episode_media",
     ),

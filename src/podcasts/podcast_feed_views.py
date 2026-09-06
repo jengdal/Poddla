@@ -27,7 +27,7 @@ from podcasts.models import (
     PodcastFeed,
     podcast_publisher,
 )
-from user_settings.basic_auth import authenticate_basic_auth, basic_auth_challenge
+from user_settings.feed_auth import authenticate_feed_token
 from valkey_changes.changes import changes
 from valkey_changes.state_store import StateStore
 
@@ -130,18 +130,17 @@ async def podcast_feed_sse(request: HttpRequest, podcast_id: int):
 
 
 @login_not_required
-async def episode_media(request: HttpRequest, episode_id: int):
+async def episode_media(request: HttpRequest, feed_token: str, episode_id: int):
     """This view serve episode audio.
 
     - We can't require the normal auth flow here as I doubt any podcast apps
-      would support that, instead we use basic auth, the users username and a
-      special basic auth password (UserSettings).
+      would support that, instead we include a secret token in the URL.
     - If the file already exists on our filesystem, it is served directly.
-    - If we need to download the file we use a process wide lock to ensure we
-      only download a single file at a time.
+    - If we need to download the file from YT we use a process wide lock to
+      ensure we only download a single file at a time.
     """
-    if await sync_to_async(authenticate_basic_auth)(request) is None:
-        return basic_auth_challenge()
+    if await authenticate_feed_token(feed_token) is None:
+        raise Http404
 
     episode = await aget_object_or_404(Episode, pk=episode_id)
     episode_file = episode.file_exists()

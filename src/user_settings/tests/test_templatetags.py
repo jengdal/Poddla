@@ -14,7 +14,7 @@ class AuthenticatedFeedUrlTagTests(TestCase):
         self.user = User.objects.create_user(username="listener", password="a-real-password")
         self.factory = RequestFactory()
 
-    def test_embeds_the_username_and_password_in_the_url(self):
+    def test_embeds_the_feed_token_in_the_url(self):
         request = self.factory.get("/")
         request.user = self.user
 
@@ -22,7 +22,5 @@ class AuthenticatedFeedUrlTagTests(TestCase):
 
         self.assertEqual(
             rendered,
-            "http://testserver/p/1/rss/".replace(
-                "://", f"://listener:{self.user.user_settings.basic_auth_password}@"
-            ),
+            f"http://testserver/f/{self.user.user_settings.feed_token}/p/1/rss/",
         )

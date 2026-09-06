@@ -1,17 +1,15 @@
 import asyncio
 import logging
 
-from asgiref.sync import sync_to_async
 from django.contrib.auth.decorators import login_not_required
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import aget_object_or_404
 from django.urls import reverse
 from django.utils.feedgenerator import Enclosure, Rss201rev2Feed
 from django.utils.http import http_date
 
 from podcasts.downloader import refresh_podcast_feed_task
-from user_settings.authenticated_urls import build_authenticated_url
-from user_settings.basic_auth import authenticate_basic_auth, basic_auth_challenge
+from user_settings.feed_auth import authenticate_feed_token
 
 from .models import PodcastFeed
 
@@ -80,17 +78,11 @@ class PodcastRssFeed(Rss201rev2Feed):
 
 
 @login_not_required
-async def podcast_feed_rss(request: HttpRequest, podcast_id: int):
-    """Serves the RSS feed.
-
-    HTTP Basic auth so that podcast apps can auth using the users basic auth
-    password (UserSettings), different than the normal auth password. We don't
-    want to serve this freely on the internet and doubt any podcast apps can do
-    a web app login flow.
-    """
-    user = await sync_to_async(authenticate_basic_auth)(request)
+async def podcast_feed_rss(request: HttpRequest, feed_token: str, podcast_id: int):
+    """Serves the RSS feed."""
+    user = await authenticate_feed_token(feed_token)
     if user is None:
-        return basic_auth_challenge()
+        raise Http404
 
     podcast = await aget_object_or_404(PodcastFeed.objects, pk=podcast_id)
     if await podcast.aneeds_updating():
@@ -118,12 +110,10 @@ async def podcast_feed_rss(request: HttpRequest, podcast_id: int):
             enclosure_length = episode_file.stat().st_size
         else:
             enclosure_length = 0
-        enclosure_url = build_authenticated_url(
-            request=request,
-            username=user.username,
-            basic_auth_password=user.user_settings.basic_auth_password,
-            view_name="podcast_episode_media",
-            args=(episode.pk,),
+        enclosure_url = request.build_absolute_uri(
+            reverse(
+                "podcast_episode_media", kwargs={"feed_token": feed_token, "episode_id": episode.pk}
+            )
         )
         feed.add_item(
             title=episode.title,

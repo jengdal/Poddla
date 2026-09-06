@@ -12,10 +12,10 @@ class UserSettingsModelBackendTests(TestCase):
     def test_get_user_select_relates_user_settings_in_one_query(self):
         with self.assertNumQueries(1):
             user = self.backend.get_user(self.user.pk)
-            _ = user.user_settings.basic_auth_password
+            _ = user.user_settings.feed_token
 
         self.assertEqual(
-            user.user_settings.basic_auth_password, self.user.user_settings.basic_auth_password
+            user.user_settings.feed_token, self.user.user_settings.feed_token
         )
 
     def test_unknown_user_id_returns_none(self):
