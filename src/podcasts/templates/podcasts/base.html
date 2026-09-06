@@ -25,12 +25,31 @@
           {% if user.is_authenticated %}
           <a href="{% url 'podcasts' %}" class="ui-button ui-small ui-tonal">Podcasts</a>
           <a href="{% url 'add_channel' %}" class="ui-button ui-small ui-tonal">Create Podcast</a>
-          <a href="{% url 'settings' %}" class="ui-button ui-small ui-tonal">Settings</a>
-          <a href="{% url 'password_change' %}" class="ui-button ui-small ui-tonal">Change password</a>
-          <form method="post" action="{% url 'logout' %}" style="display:inline">
-            {% csrf_token %}
-            <button class="ui-button ui-small ui-tonal" type="submit">Log out</button>
-          </form>
+
+          <div class="nav-dropdown" data-on:click__outside="$_account_menu_open=false">
+            <button
+              type="button"
+              class="ui-button ui-small ui-tonal nav-dropdown-toggle"
+              data-on:click="$_account_menu_open=!$_account_menu_open"
+              data-attr:aria-expanded="$_account_menu_open"
+              aria-haspopup="menu"
+            >
+              Menu
+              <svg class="nav-dropdown-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+
+            <div class="nav-dropdown-menu" role="menu" data-class:open="$_account_menu_open">
+              <a href="{% url 'settings' %}" class="nav-dropdown-item" role="menuitem">Poddla Settings</a>
+              <hr class="ui-divider" />
+              <a href="{% url 'password_change' %}" class="nav-dropdown-item" role="menuitem">Change password</a>
+              <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button class="nav-dropdown-item" type="submit" role="menuitem">Log out</button>
+              </form>
+            </div>
+          </div>
           {% endif %}
         </nav>
       </div>
