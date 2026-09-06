@@ -88,7 +88,7 @@ in
       fi
       uv run granian \
         --process-name poddla \
-        --http auto \
+        --http 2 \
         --interface asgi \
         --port 8000 \
         --host 127.0.0.1 \
@@ -208,6 +208,15 @@ in
         ./.env
       ];
     };
+  };
+
+  services.caddy = {
+    enable = true;
+    config = ''
+      https://localhost:443 {
+        reverse_proxy h2c://127.0.0.1:8000
+      }
+    '';
   };
 
   enterShell = ''
