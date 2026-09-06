@@ -15,6 +15,7 @@ dependencies = [
   "yt-dlp>=2026.7.4",
   "yt-dlp-ejs>=0.8.0",
   "granian[pname,uvloop]>=2.8.2",
+  "django-http-compression[brotli]>=1.4.0",
 ]
 
 [build-system]

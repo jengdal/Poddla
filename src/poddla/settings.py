@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.staticfiles",
+    "django_http_compression",
     "podcasts",
     "valkey_changes",
     "user_settings",
@@ -87,6 +88,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.auth.middleware.LoginRequiredMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_http_compression.middleware.HttpCompressionMiddleware",
 ]
 
 if DEBUG:
