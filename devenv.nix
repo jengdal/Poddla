@@ -22,10 +22,8 @@ let
 in
 
 {
-  # TODO: turn this on and remove the manual .env sourcings.
-  # First I need to fix this error tho:
-  # error: The dotenv integration requires the C-Nix devenv CLI. It is not
-  # available through the flake integration or another standalone Nix evaluation.
+  # `dotenv` is deprecated and doesn't work with my flake based install anyway.
+  # TODO: Consider secretspec instead?
   dotenv.enable = false;
   dotenv.disableHint = true;
 
