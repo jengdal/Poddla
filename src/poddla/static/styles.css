@@ -18,7 +18,16 @@
 }
 
 body {
-font-family: var(--font-geometric-humanist);
+  font-family: var(--font-geometric-humanist);
+}
+
+/* Make the buttons look right with the non-standard font family: */
+.ui-button {
+  line-height: 1;
+}
+
+.ui-small {
+  padding-inline: 1.25ex;
 }
 
 /* === Header === */
