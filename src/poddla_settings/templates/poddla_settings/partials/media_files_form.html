@@ -12,7 +12,8 @@
 
       {% if state.show_form %}
     <label class="ui-checkbox">
-      <input type="checkbox" data-bind="media_files.enabled" />
+      <input type="checkbox" data-bind="media_files.enabled" data-init="el.focus()"
+ />
       <span class="ui-label">Automatically delete old media files</span>
     </label>
 
@@ -27,6 +28,7 @@
           min="0"
           data-bind="media_files.data.weeks"
           data-attr:disabled="!$media_files.enabled"
+          data-init="el.focus()"
           aria-label="Weeks"/>
       </span> weeks
       <span class="ui-field settings-number-field" {% if form.days.errors %}data-invalid{% endif %}>

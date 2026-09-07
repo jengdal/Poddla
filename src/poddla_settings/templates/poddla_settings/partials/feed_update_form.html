@@ -16,10 +16,23 @@
     <p class="settings-current-value">
       Feeds are checked for new episodes at most every
       <span class="ui-field settings-number-field" {% if form.hours.errors %}data-invalid{% endif %}>
-        <input id="{{ form.hours.id_for_label }}" type="number" min="0" data-bind="feed_update.data.hours" aria-label="Hours"/>
+        <input
+          id="{{ form.hours.id_for_label }}"
+          type="number"
+          min="0"
+          data-bind="feed_update.data.hours"
+          data-init="el.focus()"
+          aria-label="Hours"
+        />
       </span>h
       <span class="ui-field settings-number-field" {% if form.minutes.errors %}data-invalid{% endif %}>
-        <input id="{{ form.minutes.id_for_label }}" type="number" min="0" data-bind="feed_update.data.minutes" aria-label="Minutes"/>
+        <input
+          id="{{ form.minutes.id_for_label }}"
+          type="number"
+          min="0"
+          data-bind="feed_update.data.minutes"
+          aria-label="Minutes"
+        />
       </span>m.
     </p>
       {% if form.hours.errors or form.minutes.errors %}
