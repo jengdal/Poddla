@@ -10,4 +10,3 @@
   - [ ] Indicate which episodes are downloaded
   - [ ] Let the user download episodes
 
-- [ ] change how podcast feeds are authed
