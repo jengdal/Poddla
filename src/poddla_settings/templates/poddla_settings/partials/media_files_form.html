@@ -18,43 +18,33 @@
 
 
     {% if state.enabled %}
-    <div class="ui-text-field" {% if form.weeks.errors %}data-invalid{% endif %}>
-      <label for="{{ form.weeks.id_for_label }}">Weeks</label>
-      <div class="ui-field">
-          <input
-            id="{{ form.weeks.id_for_label }}"
-            type="number"
-            min="0"
-            data-bind="media_files.data.weeks"
-            data-attr:disabled="!$media_files.enabled"/>
-      </div>
-      {% if form.weeks.errors %}
-        <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
-          {% for error in form.weeks.errors %}
-            <li>{{ error }}</li>
-          {% endfor %}
-        </ul>
+    <p class="settings-current-value">
+      Media files older than
+      <span class="ui-field settings-number-field" {% if form.weeks.errors %}data-invalid{% endif %}>
+        <input
+          id="{{ form.weeks.id_for_label }}"
+          type="number"
+          min="0"
+          data-bind="media_files.data.weeks"
+          data-attr:disabled="!$media_files.enabled"
+          aria-label="Weeks"/>
+      </span> weeks
+      <span class="ui-field settings-number-field" {% if form.days.errors %}data-invalid{% endif %}>
+        <input
+          id="{{ form.days.id_for_label }}"
+          type="number"
+          min="0"
+          data-bind="media_files.data.days"
+          data-attr:disabled="!$media_files.enabled"
+          aria-label="Days"/>
+      </span> days are deleted automatically.
+    </p>
+      {% if form.weeks.errors or form.days.errors %}
+    <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
+      {% for error in form.weeks.errors %}<li>Weeks: {{ error }}</li>{% endfor %}
+      {% for error in form.days.errors %}<li>Days: {{ error }}</li>{% endfor %}
+    </ul>
       {% endif %}
-    </div>
-
-    <div class="ui-text-field" {% if form.days.errors %}data-invalid{% endif %}>
-      <label for="{{ form.days.id_for_label }}">Days</label>
-      <div class="ui-field">
-          <input
-            id="{{ form.days.id_for_label }}"
-            type="number"
-            min="0"
-            data-bind="media_files.data.days"
-            data-attr:disabled="!$media_files.enabled"/>
-      </div>
-      {% if form.days.errors %}
-        <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
-          {% for error in form.days.errors %}
-            <li>{{ error }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    </div>
     {% endif %}
 
     <div class="ui-actions">
@@ -73,10 +63,7 @@
       {% else %}
         {% if state.enabled %}
     <p class="settings-current-value">
-        Media files older than
-        {% if current.weeks %}{{ current.weeks }} weeks{% endif %}
-        {% if current.days %}{{ current.days }} days{% endif %}
-        are deleted automatically.
+        Media files older than{% if current.weeks %} {{ current.weeks }} weeks{% endif %}{% if current.days %} {{ current.days }} days{% endif %}{% if not current.weeks and not current.days %} 0 days{% endif %} are deleted automatically.
     </p>
         {% else %}
     <p class="settings-current-value">Automatic deletion of old media files is disabled.</p>

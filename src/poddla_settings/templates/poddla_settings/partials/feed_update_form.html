@@ -13,33 +13,21 @@
     <legend>Feed updates</legend>
 
       {% if state.show_form %}
-    <div class="ui-text-field" {% if form.hours.errors %}data-invalid{% endif %}>
-      <label for="{{ form.hours.id_for_label }}">Hours</label>
-      <div class="ui-field">
-          <input id="{{ form.hours.id_for_label }}" type="number" data-bind="feed_update.data.hours" min="0"/>
-      </div>
-      {% if form.hours.errors %}
-        <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
-          {% for error in form.hours.errors %}
-            <li>{{ error }}</li>
-          {% endfor %}
-        </ul>
+    <p class="settings-current-value">
+      Feeds are checked for new episodes at most every
+      <span class="ui-field settings-number-field" {% if form.hours.errors %}data-invalid{% endif %}>
+        <input id="{{ form.hours.id_for_label }}" type="number" min="0" data-bind="feed_update.data.hours" aria-label="Hours"/>
+      </span>h
+      <span class="ui-field settings-number-field" {% if form.minutes.errors %}data-invalid{% endif %}>
+        <input id="{{ form.minutes.id_for_label }}" type="number" min="0" data-bind="feed_update.data.minutes" aria-label="Minutes"/>
+      </span>m.
+    </p>
+      {% if form.hours.errors or form.minutes.errors %}
+    <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
+      {% for error in form.hours.errors %}<li>Hours: {{ error }}</li>{% endfor %}
+      {% for error in form.minutes.errors %}<li>Minutes: {{ error }}</li>{% endfor %}
+    </ul>
       {% endif %}
-    </div>
-
-    <div class="ui-text-field" {% if form.minutes.errors %}data-invalid{% endif %}>
-      <label for="{{ form.minutes.id_for_label }}">Minutes</label>
-      <div class="ui-field">
-          <input id="{{ form.minutes.id_for_label }}" type="number" data-bind="feed_update.data.minutes" min="0"/>
-      </div>
-      {% if form.minutes.errors %}
-        <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
-          {% for error in form.minutes.errors %}
-            <li>{{ error }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    </div>
 
     <div class="ui-actions">
       <button
@@ -57,11 +45,7 @@
 
       {% else %}
     <p class="settings-current-value">
-        Feeds are checked for new episodes at most every
-        {% if current.hours %}
-          {{ current.hours }}h
-        {%endif%}{%if current.minutes %}
-          {{ current.minutes }}m{%endif%}.
+        Feeds are checked for new episodes at most every{% if current.hours %} {{ current.hours }}h{% endif %}{% if current.minutes %} {{ current.minutes }}m{% endif %}{% if not current.hours and not current.minutes %} 0m{% endif %}.
     </p>
       <button class="ui-button ui-outlined" type="button" data-on:click="$feed_update.show_form=true; el.dispatchEvent(new Event('change', { bubbles: true }));">Edit</button>
       {% endif %}

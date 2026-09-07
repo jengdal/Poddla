@@ -13,8 +13,12 @@
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 body {
@@ -247,7 +251,6 @@ a.ui-card:hover {
   gap: var(--size-2);
 }
 
-
 /* === Add-channel layout === */
 .add-channel-layout {
   display: flex;
@@ -337,8 +340,8 @@ a.ui-card:hover {
 
 .settings-field-group {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--size-4);
   border: 0;
   padding: 0;
@@ -352,9 +355,34 @@ a.ui-card:hover {
   font-weight: 600;
 }
 
-.settings-field-group .ui-text-field {
-  flex: 1;
-  min-inline-size: 12rem;
+/* A small boxed number input that flows inline inside a settings sentence,
+   e.g. "...at most every [_2_]h [_15_]m." */
+.settings-field-group .settings-number-field {
+  --_bg-color: var(--surface-default);
+  --_border-color: var(--field-border-color);
+  --_field-padding-block: var(--size-1);
+  --_field-padding-inline: var(--size-1);
+  --_height: var(--field-size-x-small);
+  display: inline-flex;
+  inline-size: auto;
+  vertical-align: middle;
+}
+
+.settings-field-group .settings-number-field input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+  inline-size: 6ch;
+  text-align: center;
+}
+
+.settings-field-group .settings-number-field input::-webkit-outer-spin-button,
+.settings-field-group .settings-number-field input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.settings-field-group .settings-number-field[data-invalid] {
+  --_border-color: var(--color-9);
 }
 
 .settings-field-group .settings-current-value {
