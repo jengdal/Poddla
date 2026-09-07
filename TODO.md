@@ -5,8 +5,11 @@
 - [ ] Include chapter markers based on YT data, and/or use a local LLM to figure them out based on
       the audio.
 - [ ] Let the admin user manage users?
+- [ ] Implement the media file cleanup job.
 
 - The episode list page
   - [ ] Indicate which episodes are downloaded
   - [ ] Let the user download episodes
 
+- [ ] Verify the subscribe in app buttons
+- [ ] Configure a devcontainer with devenv
