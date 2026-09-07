@@ -128,7 +128,7 @@ async def _refresh_podcast_feed(podcast: PodcastFeed) -> None:
 
 
 async def download_episode_media(episode: Episode) -> Episode:
-    episode_file = episode.file_exists()
+    episode_file = await episode.file_exists()
     if episode_file:
         return episode
     async with changes(episode_publisher.subscribe(pk=episode.id)) as changed:
@@ -137,7 +137,7 @@ async def download_episode_media(episode: Episode) -> Episode:
             handed_off = False
             try:
                 episode = await Episode.objects.aget(id=episode.id)
-                episode_file = episode.file_exists()
+                episode_file = await episode.file_exists()
                 if not episode_file and outcome == "lock":
                     # If we get cancelled the lock would immediately be released by the
                     # `finally` below, but the yt-dlp download would still continue until

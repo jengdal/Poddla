@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -111,14 +112,17 @@ class Episode(models.Model):
 
     file_path = models.CharField(max_length=100, null=True, blank=True)
 
-    def file_exists(self) -> Path | None:
+    async def file_exists(self) -> Path | None:
         media_root = Path(settings.MEDIA_ROOT)
         if self.file_path:
             episode_file = media_root / str(self.file_path)
         else:
             episode_file = None
-        if episode_file is not None and episode_file.exists():
-            return episode_file
+
+        if episode_file is not None:
+            exists = await asyncio.to_thread(episode_file.exists)
+            if exists:
+                return episode_file
 
     class Meta:
         constraints = [

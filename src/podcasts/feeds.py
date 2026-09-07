@@ -105,7 +105,7 @@ async def podcast_feed_rss(request: HttpRequest, feed_token: str, podcast_id: in
     )
 
     async for episode in podcast.episodes.order_by("-published_at"):
-        episode_file = episode.file_exists()
+        episode_file = await episode.file_exists()
         if episode_file:
             enclosure_length = episode_file.stat().st_size
         else:

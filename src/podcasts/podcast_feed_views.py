@@ -143,11 +143,11 @@ async def episode_media(request: HttpRequest, feed_token: str, episode_id: int):
         raise Http404
 
     episode = await aget_object_or_404(Episode, pk=episode_id)
-    episode_file = episode.file_exists()
+    episode_file = await episode.file_exists()
     if not episode_file:
         # `download_episode_media` makes sure the file is only downloaded once.
         episode = await download_episode_media(episode=episode)
-        episode_file = episode.file_exists()
+        episode_file = await episode.file_exists()
 
     if not episode_file:
         logger.error("The Episode (%s) file was not downloaded.", episode.id)
