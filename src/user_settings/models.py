@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import models
 
 # Letters and numbers that can be confused with each other are removed:
-FEED_TOKEN_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"
+FEED_TOKEN_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"  # nosec B105
 FEED_TOKEN_LENGTH = 20
 FEED_TOKEN_GROUP_SIZE = 5
 
