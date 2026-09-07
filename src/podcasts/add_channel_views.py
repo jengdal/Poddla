@@ -171,7 +171,6 @@ async def set_state(request: HttpRequest):
                     cache_seconds=settings.YOUTUBE_META_CACHE_SECONDS,
                     entries_limit=10,
                 )
-                await asyncio.sleep(3)
                 podcast = await sync_to_async(PodcastFeed.drafts.create_draft)(feed)
 
                 state.can_save = True
