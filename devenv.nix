@@ -84,12 +84,11 @@ in
         source .env
         set +a
       fi
+
+      # Configure Granian using the .env file.
       uv run granian \
         --process-name poddla \
-        --http 2 \
         --interface asgi \
-        --port 8000 \
-        --host 127.0.0.1 \
         --workers 1 \
         --no-ws \
         --workers-kill-timeout 1 \
