@@ -10,7 +10,7 @@
     <h1 class="ui-h4">Poddla Settings</h1>
 
     {% include "poddla_settings/partials/feed_update_form.html" with form=feed_update_context.form state=feed_update_context.state current=feed_update_context.current post_call=feed_update_context.post_call only %}
-    {% include "poddla_settings/partials/media_files_form.html" with form=media_files_context.form state=media_files_context.state current=media_files_context.current post_call=media_files_context.post_call only %}
+    {% include "poddla_settings/partials/media_files_form.html" with form=media_files_context.form state=media_files_context.state current=media_files_context.current post_call=media_files_context.post_call enabled=media_files_context.enabled only %}
     </div>
   </div>
 

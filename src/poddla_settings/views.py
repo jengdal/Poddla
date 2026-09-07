@@ -68,6 +68,7 @@ def _sync_render(
         "form": media_files_form,
         "state": media_files_state,
         "current": media_files_current,
+        "enabled": current_settings.media_files_expiry_enabled,
         "post_call": mark_safe(
             f"@post('{reverse('settings_set_media_files_state')}', {{'headers': {{'x-csrftoken': '{csrf_token}'}}}})"
         ),

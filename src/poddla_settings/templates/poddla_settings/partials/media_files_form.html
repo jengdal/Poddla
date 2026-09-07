@@ -63,7 +63,7 @@
     </div>
 
       {% else %}
-        {% if state.enabled %}
+        {% if enabled %}
     <p class="settings-current-value">
         Media files older than{% if current.weeks %} {{ current.weeks }} weeks{% endif %}{% if current.days %} {{ current.days }} days{% endif %}{% if not current.weeks and not current.days %} 0 days{% endif %} are deleted automatically.
     </p>
