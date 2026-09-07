@@ -5,7 +5,7 @@
   data-class:loading="$feed_update.loading"
   {# Using the form submit we get submit by return key #}
   data-on:submit="$feed_update.loading=true; $feed_update.save=true; {{ post_call }}"
-  data-on:keyup__debounce.200ms__capture="(!$feed_update.loading && {{ post_call }}"
+  data-on:keyup__debounce.200ms__capture="(!$feed_update.loading && {{ post_call }})"
   data-on:change__capture="{{ post_call }}"
 >
 
