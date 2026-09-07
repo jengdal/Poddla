@@ -110,9 +110,10 @@ async def fetch_feed(
             (e for e in entries if "Videos" in (e.get("title") or "")),
             entries[0],
         )
-        url = str(videos_tab["webpage_url"])
+        url = videos_tab.get("webpage_url")
         if not url:
             raise Exception(f"Could not find the URL to the Videos tab on {original_url}")
+        url = str(url)
         logger.debug("Using %s instead of %s.", url, original_url)
         info = await run_cached(
             _yt_cache_key(url, entries_limit),
