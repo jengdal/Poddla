@@ -124,21 +124,30 @@ in
   };
 
   # This builds the docker image and loads it into your docker. Use it with: `poddla:latest`.
+  # Needs CONTAINER_ENGINE to be set in .env.
   scripts.docker-build-load = {
     exec = ''
       set -euo pipefail
 
+      if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+      fi
+      CONTAINER_ENGINE="''${CONTAINER_ENGINE:?CONTAINER_ENGINE is not set (see .env.example)}"
+
       output="poddla-image-$(uname -m)"
       echo "Building $output..."
       store_path=$(devenv build "outputs.$output" | jq -r ".\"outputs.$output\"")
-      docker load < "$store_path"
+      "$CONTAINER_ENGINE" load < "$store_path"
     '';
   };
 
-  # Build both arch images (see `docker.nix`) and publish them to the registry as one
-  # multi-arch tag. Usage: `devenv shell docker-publish [tag]` (defaults to `latest`).
-  # Reads DOCKER_REGISTRY_IMAGE from .env (see .env.example). Assumes you've already
-  # run `docker login forgejo.example.com`.
+  # Build both arch images (see `docker.nix`) and publish them to the registry
+  # as one multi-arch tag. Usage: `devenv shell docker-publish [tag]` (defaults
+  # to `latest`). Needs DOCKER_REGISTRY_IMAGE and CONTAINER_ENGINE to be set in
+  # .env. Assumes you've already run `docker login forgejo.example.com`. or
+  # whatever your registry is.
   scripts.docker-publish = {
     exec = ''
       set -euo pipefail
@@ -150,6 +159,7 @@ in
       fi
 
       REGISTRY_IMAGE="''${DOCKER_REGISTRY_IMAGE:?DOCKER_REGISTRY_IMAGE is not set (see .env.example)}"
+      CONTAINER_ENGINE="''${CONTAINER_ENGINE:?CONTAINER_ENGINE is not set (see .env.example)}"
       TAG="''${1:-latest}"
 
       # Built the two architectures in one go. The slow uv2nix parsing can then be shared between them.
@@ -160,9 +170,9 @@ in
         local arch="$1" output="$2"
         local store_path
         store_path=$(jq -r ".\"outputs.$output\"" <<< "$build_paths")
-        docker load < "$store_path"
-        docker tag poddla:latest "$REGISTRY_IMAGE:$TAG-$arch"
-        docker push "$REGISTRY_IMAGE:$TAG-$arch"
+        "$CONTAINER_ENGINE" load < "$store_path"
+        "$CONTAINER_ENGINE" tag poddla:latest "$REGISTRY_IMAGE:$TAG-$arch"
+        "$CONTAINER_ENGINE" push "$REGISTRY_IMAGE:$TAG-$arch"
       }
 
       publish_arch amd64 poddla-image-amd64
@@ -170,12 +180,12 @@ in
 
       # Remove any items from previous runs.
       # TODO: Could we be doing these things better?
-      docker manifest rm "$REGISTRY_IMAGE:$TAG" 2>/dev/null || true
+      "$CONTAINER_ENGINE" manifest rm "$REGISTRY_IMAGE:$TAG" 2>/dev/null || true
 
-      docker manifest create "$REGISTRY_IMAGE:$TAG" \
+      "$CONTAINER_ENGINE" manifest create "$REGISTRY_IMAGE:$TAG" \
         --amend "$REGISTRY_IMAGE:$TAG-amd64" \
         --amend "$REGISTRY_IMAGE:$TAG-arm64"
-      docker manifest push "$REGISTRY_IMAGE:$TAG"
+      "$CONTAINER_ENGINE" manifest push "$REGISTRY_IMAGE:$TAG"
     '';
   };
 
