@@ -24,7 +24,7 @@
       <div class="ui-text-field" {% if form.url.errors %}data-invalid{% endif %}>
         <label for="{{ form.url.id_for_label }}">YouTube URL</label>
         <div class="ui-field">
-          <input type="text" id="{{ form.url.id_for_label }}" name="url" data-bind='url' />
+          <input type="text" id="{{ form.url.id_for_label }}" name="url" data-bind='url' autofocus/>
         </div>
         {% if form.url.errors %}
           <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
