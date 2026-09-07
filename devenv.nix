@@ -65,6 +65,7 @@ in
     javascript = {
       # Atm. pnpm is only used for installing the open props UI _CSS_ package.
       enable = true;
+      package = pkgs.nodejs-slim;
 
       pnpm = {
         enable = true;
