@@ -6,6 +6,8 @@ from .models import UserSettings
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def create_user_settings(sender, instance, created, **kwargs):
+def create_user_settings(sender, instance, created, raw=False, **kwargs):
+    if raw:
+        return
     if created:
         UserSettings.objects.create(user=instance)
