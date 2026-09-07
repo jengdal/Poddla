@@ -375,6 +375,10 @@ a.ui-card:hover {
   text-align: center;
 }
 
+.settings-field-group .settings-number-field input:focus-visible {
+  outline-offset: -2px;
+}
+
 .settings-field-group .settings-number-field input::-webkit-outer-spin-button,
 .settings-field-group .settings-number-field input::-webkit-inner-spin-button {
   appearance: none;
