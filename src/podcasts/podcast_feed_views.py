@@ -26,6 +26,7 @@ from podcasts.downloader import download_episode_media, refresh_podcast_feed_tas
 from podcasts.models import (
     Episode,
     PodcastFeed,
+    episode_publisher,
     podcast_publisher,
 )
 from user_settings.feed_auth import authenticate_feed_token
@@ -147,8 +148,37 @@ async def episode_media(request: HttpRequest, feed_token: str, episode_id: int):
     episode_file = await episode.file_exists()
     if not episode_file:
         # `download_episode_media` makes sure the file is only downloaded once.
-        episode = await download_episode_media(episode=episode)
-        episode_file = await episode.file_exists()
+        task = await download_episode_media(episode=episode)
+
+        async with changes(episode_publisher.subscribe(pk=episode.id)) as changed:
+            # Either our or another client's task will download the file, so we wait for
+            # both the download task and episode changes.
+            while True:
+                episode = await Episode.objects.aget(id=episode.id)
+                episode_file = await episode.file_exists()
+                if episode_file:
+                    if not task.done():
+                        # Another clients task downloaded it.
+                        task.cancel("File already exists.")
+                    break
+                if task.done():
+                    break
+
+                changed_wait = asyncio.create_task(changed.wait())
+                try:
+                    await asyncio.wait({task, changed_wait}, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    # This is the sort of stuff that makes working with asyncio a pain.
+                    if not changed_wait.done():
+                        changed_wait.cancel()
+                        try:
+                            await changed_wait
+                        except asyncio.CancelledError:
+                            pass
+
+            if task.done() and not task.cancelled():
+                # Raise any exception that happened in the task:
+                task.result()
 
     if not episode_file:
         logger.error("The Episode (%s) file was not downloaded.", episode.id)

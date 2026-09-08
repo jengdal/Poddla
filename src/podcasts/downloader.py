@@ -5,16 +5,14 @@ from pathlib import Path
 
 from django.conf import settings
 
-from podcasts.asyncio_utils import start_task, wait_lock_or_func
+from podcasts.asyncio_utils import start_task
 from podcasts.models import (
     Episode,
     PodcastFeed,
-    episode_publisher,
 )
 from podcasts.youtube import fetch_feed
 from podcasts.youtube.video import download_audio
 from valkey_changes import valkey_client
-from valkey_changes.changes import changes
 
 # When refreshing a YT channel we fetch at most this many video entries
 # initially. If we only find new entries within those, we fetch more.
@@ -130,38 +128,24 @@ async def _refresh_podcast_feed(podcast: PodcastFeed) -> None:
     logger.debug("Done refreshing PodcastFeed (%s)", podcast.id)
 
 
-async def download_episode_media(episode: Episode) -> Episode:
+async def _download_episode_media(episode: Episode) -> Episode:
     episode_file = await episode.file_exists()
     if episode_file:
         return episode
-    async with changes(episode_publisher.subscribe(pk=episode.id)) as changed:
-        while not episode_file:
-            outcome, _ = await wait_lock_or_func(_audio_download_lock, changed.wait())
-            handed_off = False
-            try:
-                episode = await Episode.objects.aget(id=episode.id)
-                episode_file = await episode.file_exists()
-                if not episode_file and outcome == "lock":
-                    # If we get cancelled the lock would immediately be released by the
-                    # `finally` below, but the yt-dlp download would still continue until
-                    # it finished. This means the lock mechanism would basically be broken,
-                    # we could have multiple concurrent downloads just because clients
-                    # disconnected. We take care of that by letting the task release when
-                    # it's done:
-                    handed_off = True
-                    return await asyncio.shield(asyncio.create_task(_download_and_release(episode)))
-            finally:
-                if outcome == "lock" and not handed_off:
-                    _audio_download_lock.release()
 
-    return episode
-
-
-async def _download_and_release(episode: Episode) -> Episode:
-    try:
+    async with _audio_download_lock:
+        episode = await Episode.objects.aget(id=episode.id)
+        episode_file = await episode.file_exists()
+        if episode_file:
+            return episode
         return await _download_and_update(episode)
-    finally:
-        _audio_download_lock.release()
+
+
+async def download_episode_media(episode: Episode) -> asyncio.Task[Episode]:
+    return start_task(
+        _download_episode_media(episode=episode),
+        on_error="The podcast episode download task failed.",
+    )
 
 
 async def _download_and_update(episode: Episode) -> Episode:
