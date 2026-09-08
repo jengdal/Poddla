@@ -6,6 +6,7 @@
       the audio.
 - [ ] Let the admin user manage users?
 - [ ] Implement the media file cleanup job.
+- [ ] Create a flake.nix for installing Poddla on NixOS without using Docker.
 
 - The episode list page
   - [ ] Indicate which episodes are downloaded
