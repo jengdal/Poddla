@@ -82,6 +82,9 @@ async def _fetch_and_update(podcast: PodcastFeed, entries_limit: int):
         cache_seconds=settings.YOUTUBE_META_CACHE_SECONDS,
         entries_limit=entries_limit,
     )
+    if not feed.title:
+        # TODO: `fetch_feed` should raise on errors.
+        raise Exception("Bad YT response.")
 
     podcast.name = feed.title
     podcast.description = feed.description or ""

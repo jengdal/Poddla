@@ -42,6 +42,7 @@ def _extract_info(url: str, entries_limit: int | None) -> dict:
         # "no_warnings": False,
         "quiet": True,
         "extract_flat": True,
+        # TODO: This needs to be False, but that requires a little bit of refactoring:
         "ignoreerrors": True,
         "extractor_args": {"youtubetab": {"approximate_date": ["True"]}},
     }
