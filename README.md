@@ -116,6 +116,7 @@ See the `devenv.nix` file and/or run `devenv info` for details.
   and cache.
 - [SQLite](https://sqlite.org/) is used as the database, through Django's ORM.
 - [Granian](https://github.com/emmett-framework/granian) as the ASGI HTTP2 (h2c) server
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) Is used to interact with YT
 
 ### Environment variables
 
