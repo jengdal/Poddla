@@ -92,6 +92,7 @@ in
         --interface asgi \
         --workers 1 \
         --no-ws \
+        # SSE requests have to be killed when stopping:
         --workers-kill-timeout 1 \
         --reload \
         --reload-paths ./src/ \
@@ -230,6 +231,7 @@ in
     };
   };
 
+  # There's a devenv caddy service as well, but this way we can read the .env file:
   processes.caddy = {
     exec = ''
       if [ -f .env ]; then
