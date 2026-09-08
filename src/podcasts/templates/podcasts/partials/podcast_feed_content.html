@@ -23,12 +23,8 @@
         {% endwith %}
         {% authed_feed_url 'podcast_feed_rss' state.podcast_id as feed_url %}
         <div class="podcast-subscribe-links">
-          <a href="podcast://{{ feed_url|strip_scheme }}" class="ui-button ui-primary ui-tonal">Apple Podcasts</a>
-          <a href="overcast://x-callback-url/add?url={{ feed_url|urlencode }}" class="ui-button ui-primary ui-tonal">Overcast</a>
-          <a href="castro://subscribe/{{ feed_url|strip_scheme }}" class="ui-button ui-primary ui-tonal">Castro</a>
-          <a href="pktc://subscribe/{{ feed_url|strip_scheme }}" class="ui-button ui-primary ui-tonal">Pocket Casts</a>
           <a href="{{ feed_url }}" class="ui-button ui-primary ui-filled">RSS</a>
-          <button type="button" class="ui-button ui-primary ui-filled" onclick="navigator.clipboard.writeText('{{ feed_url|escapejs }}'); this.textContent='Copied!';" title="Copy the RSS URL. Then paste it into your podcast player.">Copy RSS URL</button>
+          <button type="button" class="ui-button ui-primary ui-tonal" onclick="navigator.clipboard.writeText('{{ feed_url|escapejs }}'); this.textContent='Copied!';" title="Copy the RSS URL. Then paste it into your podcast player.">Copy RSS URL</button>
         </div>
         <article role="note" class="ui-callout">
           <svg

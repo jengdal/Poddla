@@ -12,6 +12,6 @@
   - [ ] Indicate which episodes are downloaded
   - [ ] Let the user download episodes
 
-- [ ] Verify the subscribe in app buttons
+- [ ] Add back the app-subscribe buttons and figure out how to make them work
 - [ ] Configure a devcontainer with devenv
 - [ ] Cache the thumbnail images as the links seem to expire after a while
