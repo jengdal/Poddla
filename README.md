@@ -127,7 +127,7 @@ Create your own `.env` file based on `.env.example`.
 Start Valkey and Caddy. This will start process-compose in the active terminal, you'll want to leave
 it running.
 
-```
+```sh
 devenv up valkey caddy
 ```
 
