@@ -2,6 +2,7 @@ import asyncio
 import logging
 import mimetypes
 from pathlib import Path
+from urllib.parse import quote
 
 import msgspec
 from asgiref.sync import sync_to_async
@@ -156,41 +157,12 @@ async def episode_media(request: HttpRequest, feed_token: str, episode_id: int):
     # Granian supports ASGI `pathsend`, which would let us hand off the file
     # path to it, and have it serve the file to the client. The problem is that
     # `pathsend` doesn't support `Range` requests, which would mean streaming
-    # audio to podcast clients wouldn't work.
-    # Instead, we serve the file ourselves from python.
-    return _serve_with_range(request, episode_file)
-
-
-def _serve_with_range(request: HttpRequest, filepath: Path) -> HttpResponse:
-    file_size = filepath.stat().st_size
-    content_type = mimetypes.guess_type(str(filepath))[0] or "application/octet-stream"
-    range_header = request.headers.get("Range")
-
-    if not range_header:
-        response = FileResponse(filepath.open("rb"), content_type=content_type)
-        response["Accept-Ranges"] = "bytes"
-        return response
-
-    range_spec = range_header.strip().removeprefix("bytes=")
-    start_str, _, end_str = range_spec.partition("-")
-    start = int(start_str) if start_str else 0
-    end = int(end_str) if end_str else file_size - 1
-    end = min(end, file_size - 1)
-    length = end - start + 1
-
-    def read_range():
-        with filepath.open("rb") as f:
-            f.seek(start)
-            remaining = length
-            while remaining > 0:
-                chunk = f.read(min(65536, remaining))
-                if not chunk:
-                    break
-                remaining -= len(chunk)
-                yield chunk
-
-    response = StreamingHttpResponse(read_range(), status=206, content_type=content_type)
-    response["Content-Range"] = f"bytes {start}-{end}/{file_size}"
-    response["Content-Length"] = str(length)
-    response["Accept-Ranges"] = "bytes"
+    # audio to podcast clients wouldn't work. But since we're anyway always
+    # behind Caddy, we can hand off the file path to it instead. Caddy supports
+    # `Range` requests just fine.
+    # Note that _every single range request_ a streaming client makes will hit
+    # this django view.
+    response = HttpResponse(status=200)
+    # Note that we use the relative path, not the full `episode_file`:
+    response["X-Accel-Redirect"] = quote(f"/{episode.file_path}")
     return response

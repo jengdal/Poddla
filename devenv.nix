@@ -230,13 +230,21 @@ in
     };
   };
 
-  services.caddy = {
-    enable = true;
-    config = ''
-      https://localhost:443 {
-        reverse_proxy h2c://127.0.0.1:8000
-      }
+  processes.caddy = {
+    exec = ''
+      if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+      fi
+      ${pkgs.caddy}/bin/caddy run --watch --config dev/Caddyfile
     '';
+
+    watch = {
+      paths = [
+        ./.env
+      ];
+    };
   };
 
   enterShell = ''

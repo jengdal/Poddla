@@ -1,0 +1,11 @@
+https://localhost:443 {
+	reverse_proxy h2c://127.0.0.1:8000 {
+		@accel header X-Accel-Redirect *
+		handle_response @accel {
+			root {$MEDIA_ROOT}
+			rewrite {rp.header.X-Accel-Redirect}
+			method GET
+			file_server
+		}
+	}
+}

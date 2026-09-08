@@ -11,5 +11,16 @@
 # - http://poddla.example.com:8080 if you only want http on port 8080.
 # - https://poddla.example.com for https.
 {$SITE_ADDRESS} {
-	reverse_proxy {$PODDLA_ADDRESS}
+	reverse_proxy {$PODDLA_ADDRESS} {
+		# Caddy serves the media files. Our Django view hands off the
+		# filepath it wants Caddy to serve by way of the
+		# x-accel-redirect header.
+		@accel header X-Accel-Redirect *
+		handle_response @accel {
+			root {$MEDIA_ROOT:/tmp}
+			rewrite {rp.header.X-Accel-Redirect}
+			method GET
+			file_server
+		}
+	}
 }

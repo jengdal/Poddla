@@ -48,8 +48,11 @@ services:
       SITE_ADDRESS: https://localhost:4444
       PODDLA_ADDRESS: h2c://poddla:8000
       # TRUSTED_PROXIES: 192.168.1.1/32
+      MEDIA_ROOT: /data/media
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Caddy serves the media files:
+      - ./data/media:/data/media
     depends_on:
       - poddla
     restart: unless-stopped
