@@ -14,3 +14,4 @@
 
 - [ ] Verify the subscribe in app buttons
 - [ ] Configure a devcontainer with devenv
+- [ ] Cache the thumbnail images as the links seem to expire after a while
