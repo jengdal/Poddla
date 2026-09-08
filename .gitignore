@@ -26,3 +26,6 @@ staticfiles
 db.sqlite3
 dump.rdb
 media
+
+# The example docker compose puts files here:
+deploy/data
