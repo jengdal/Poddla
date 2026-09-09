@@ -285,17 +285,24 @@ a.ui-card:hover {
   width: 100%;
 }
 
-/* Block interaction and show a spinner overlay while loading */
-#add-channel-container.loading {
+/* === Loading overlay: blocks a form while an async action is in flight === */
+:is(#add-channel-container, .settings-form-panel .ui-form) {
   position: relative;
+}
+
+:is(#add-channel-container, .settings-form-panel .ui-form) > * {
+  transition: opacity 0.15s var(--ease-3);
+}
+
+:is(#add-channel-container, .settings-form-panel .ui-form).loading {
   pointer-events: none;
 }
 
-#add-channel-container.loading > * {
+:is(#add-channel-container, .settings-form-panel .ui-form).loading > * {
   opacity: 0.5;
 }
 
-#add-channel-container.loading::after {
+:is(#add-channel-container, .settings-form-panel .ui-form)::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -305,12 +312,25 @@ a.ui-card:hover {
   border: 3px solid var(--surface-filled);
   border-block-start-color: var(--text-primary);
   border-radius: 50%;
-  animation: add-channel-spin 0.7s linear infinite;
+  opacity: 0;
+  scale: 0.85;
+  pointer-events: none;
+  animation: loading-spinner-spin 0.7s linear infinite;
+  animation-play-state: paused;
+  transition:
+    opacity 0.2s var(--ease-3),
+    scale 0.2s var(--ease-spring-3);
 }
 
-@keyframes add-channel-spin {
+:is(#add-channel-container, .settings-form-panel .ui-form).loading::after {
+  opacity: 1;
+  scale: 1;
+  animation-play-state: running;
+}
+
+@keyframes loading-spinner-spin {
   to {
-    transform: rotate(1turn);
+    rotate: 1turn;
   }
 }
 
@@ -396,27 +416,4 @@ a.ui-card:hover {
 
 .settings-field-group .ui-actions {
   inline-size: 100%;
-}
-
-/* Block interaction and show a spinner overlay on a form while it's saving */
-.settings-form-panel .ui-form.loading {
-  position: relative;
-  pointer-events: none;
-}
-
-.settings-form-panel .ui-form.loading > * {
-  opacity: 0.5;
-}
-
-.settings-form-panel .ui-form.loading::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  inline-size: 2rem;
-  block-size: 2rem;
-  border: 3px solid var(--surface-filled);
-  border-block-start-color: var(--text-primary);
-  border-radius: 50%;
-  animation: add-channel-spin 0.7s linear infinite;
 }
