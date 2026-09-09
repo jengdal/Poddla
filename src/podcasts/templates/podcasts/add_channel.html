@@ -39,7 +39,7 @@
         <button
           class="ui-button ui-filled"
           type="submit"
-          data-attr:aria-busy="$loading && 'true'"
+          data-attr:aria-busy="(!$saving && $loading) && 'true'"
           data-attr:disabled="($loading || !$can_preview)"
           >
           Preview
