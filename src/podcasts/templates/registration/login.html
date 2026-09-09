@@ -17,11 +17,13 @@
     </div>
 
     {% if form.non_field_errors %}
-      <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
-        {% for error in form.non_field_errors %}
-          <li>{{ error }}</li>
-        {% endfor %}
-      </ul>
+      <div class="ui-fieldset" data-invalid>
+        <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
+          {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
     {% endif %}
 
     <input type="hidden" name="next" value="{{ next }}">
