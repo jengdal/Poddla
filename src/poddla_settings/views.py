@@ -174,7 +174,6 @@ async def set_feed_update_state(request: HttpRequest):
         else:
             state.data = signals.get("data", {})
 
-        # state.sync_data(signals=feed_update_signals, current_settings=current_settings)
         if state.show_form:
             form = FeedUpdateForm(data=state.data)
             state.can_save = await sync_to_async(form.is_valid)()
