@@ -134,6 +134,7 @@ class Episode(models.Model):
 
 
 podcast_publisher.register(PodcastFeed)
-# When an `Episode` is saved or deleted `podcast_publisher` will publish that the episodes parent podcast has changed:
+# When an `Episode` is saved or deleted `podcast_publisher` will publish that
+# the episodes parent podcast has changed:
 podcast_publisher.register(Episode, resolve_pk=lambda instance: instance.podcast_id)
 episode_publisher.register(Episode)
