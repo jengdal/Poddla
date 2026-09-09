@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import mimetypes
-from pathlib import Path
 from urllib.parse import quote
 
 import msgspec
@@ -13,11 +11,9 @@ from datastar_py.django import (
 )
 from django.contrib.auth.decorators import login_not_required
 from django.http import (
-    FileResponse,
     Http404,
     HttpRequest,
     HttpResponse,
-    StreamingHttpResponse,
 )
 from django.shortcuts import aget_object_or_404
 from django.template.loader import render_to_string
