@@ -9,7 +9,7 @@
   data-on:change__capture="{{ post_call }}"
 >
 
-  <fieldset class="settings-field-group">
+  <fieldset class="ui-fieldset settings-field-group" {% if form.errors %}data-invalid{% endif %}>
     <legend>Feed updates</legend>
 
       {% if state.show_form %}
@@ -35,8 +35,9 @@
         />
       </span>m.
     </p>
-      {% if form.hours.errors or form.minutes.errors %}
+      {% if form.hours.errors or form.minutes.errors or form.non_field_errors %}
     <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
+      {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
       {% for error in form.hours.errors %}<li>Hours: {{ error }}</li>{% endfor %}
       {% for error in form.minutes.errors %}<li>Minutes: {{ error }}</li>{% endfor %}
     </ul>

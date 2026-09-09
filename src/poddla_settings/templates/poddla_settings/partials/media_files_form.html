@@ -7,7 +7,7 @@
   data-on:keyup__debounce.200ms__capture="(!$media_files.loading && {{ post_call }})"
   data-on:change__capture="{{ post_call }}"
 >
-  <fieldset class="settings-field-group">
+  <fieldset class="ui-fieldset settings-field-group" {% if form.errors %}data-invalid{% endif %}>
     <legend>Media file expiration</legend>
 
       {% if state.show_form %}
@@ -41,8 +41,9 @@
           aria-label="Days"/>
       </span> days are deleted automatically.
     </p>
-      {% if form.weeks.errors or form.days.errors %}
+      {% if form.weeks.errors or form.days.errors or form.non_field_errors %}
     <ul class="ui-end-text" style="margin:0;padding-inline-start:var(--size-4)">
+      {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
       {% for error in form.weeks.errors %}<li>Weeks: {{ error }}</li>{% endfor %}
       {% for error in form.days.errors %}<li>Days: {{ error }}</li>{% endfor %}
     </ul>
