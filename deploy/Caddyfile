@@ -17,7 +17,7 @@
 		# x-accel-redirect header.
 		@accel header X-Accel-Redirect *
 		handle_response @accel {
-			root {$MEDIA_ROOT:/tmp}
+			root {$MEDIA_ROOT}
 			rewrite {rp.header.X-Accel-Redirect}
 			method GET
 			file_server
