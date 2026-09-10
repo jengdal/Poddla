@@ -92,7 +92,6 @@ in
         --interface asgi \
         --workers 1 \
         --no-ws \
-        # SSE requests have to be killed when stopping:
         --workers-kill-timeout 1 \
         --reload \
         --reload-paths ./src/ \
