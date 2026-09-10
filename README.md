@@ -27,6 +27,8 @@ of time. I have some more interesting ideas I'd like to work on next, and this p
 a starting template for those. That said, it is quite a bit nicer than a cronjob and I'm happy I
 created it.
 
+I've written a little bit about it on my [blog](https://john.engdal.fi/notes/poddla/)
+
 ## Security
 
 This applies to most Podcast players, but I'm sure there are exceptions: Poddla's podcast RSS feeds
